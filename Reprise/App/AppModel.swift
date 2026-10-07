@@ -382,7 +382,8 @@ enum IslandState: Equatable {
     // MARK: Library
 
     func rename(_ recording: Recording, to title: String) {
-        var recording = recording
+        // The library's own: the detail may hold it from before the save set its duration.
+        guard var recording = store.recordings.first(where: { $0.id == recording.id }) else { return } // trashed
         recording.title = title
         store.save(recording)
         if session?.recording.id == recording.id { session?.recording.title = title }

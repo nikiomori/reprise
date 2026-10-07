@@ -174,16 +174,10 @@ private struct RecordingDetail: View {
     /// Made on appear, not in `init`: SwiftUI makes this view anew on every change around it
     /// (each letter typed into the search), and each would open the file in a new player.
     @State private var player: Player?
-    @State private var title: String
+    @State private var title = "" // only while renaming; the header shows the saved title
     @State private var renaming = false
     @FocusState private var titleFocused: Bool
     @Environment(\.undoManager) private var undoManager
-
-    init(recording: Recording, model: AppModel) {
-        self.recording = recording
-        self.model = model
-        _title = State(initialValue: recording.title)
-    }
 
     var body: some View {
         ScrollView {
@@ -247,10 +241,11 @@ private struct RecordingDetail: View {
                         .onAppear { titleFocused = true }
                         .onSubmit(saveTitle)
                         .onChange(of: titleFocused) { if !titleFocused { saveTitle() } }
+                        .onDisappear { if renaming { saveTitle() } } // another call clicked: kept, as in Finder
                         .onExitCommand { title = recording.title; renaming = false }
                 } else {
-                    Button { renaming = true } label: { // a button, so the keyboard and VoiceOver reach it too
-                        Text(title).font(.system(.title, weight: .bold))
+                    Button { title = recording.title; renaming = true } label: { // a button, so the keyboard and VoiceOver reach it too
+                        Text(recording.title).font(.system(.title, weight: .bold))
                     }
                     .buttonStyle(.plain)
                     .pointerStyle(.horizontalText) // reads as editable, like a name in Finder
