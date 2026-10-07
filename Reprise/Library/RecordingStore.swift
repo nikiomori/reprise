@@ -120,6 +120,7 @@ struct Recording: Codable, Identifiable, Equatable {
         if recording.duration == 0, let seconds = try? await AVURLAsset(url: recording.audioURL).load(.duration).seconds {
             recording.duration = seconds // a recording cut short by a crash
         }
+        recording.title = recordings.first { $0.id == recording.id }?.title ?? recording.title // renamed while saving
         save(recording)
         return recording
     }

@@ -199,6 +199,16 @@ struct UpdaterTests {
         #expect(FileManager.default.fileExists(atPath: recording.videoURL.path)) // still in the folder
     }
 
+    /// Renamed while the stopped recording was still being saved: the save keeps the new title.
+    @Test func renameWhileSavingStays() async throws {
+        let recording = try store.create(app: nil, at: .now)
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        var renamed = recording
+        renamed.title = "Interview"
+        store.save(renamed)
+        #expect(await store.finalize(recording).title == "Interview")
+    }
+
     /// Two seconds of sound in the crash-safe stream and a second of movie without sound, as a recording leaves them.
     private func screenRecording(movieStart: TimeInterval?) async throws -> Recording {
         var recording = try store.create(app: nil, at: .now)
