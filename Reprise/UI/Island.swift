@@ -232,6 +232,7 @@ private struct ScreenToggle: View {
 private struct RecordingContent: View {
     let model: AppModel
     @State private var expanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 10) {
@@ -260,7 +261,7 @@ private struct RecordingContent: View {
         .contentShape(.capsule)
         .onTapGesture(count: 2, perform: model.hidePill)
         .onHover { hovering in
-            withAnimation(.spring(duration: 0.4, bounce: 0.3)) { expanded = hovering }
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.4, bounce: 0.3)) { expanded = hovering }
         }
         #if DEBUG
         .task {

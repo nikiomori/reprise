@@ -137,10 +137,11 @@ private struct Step: View {
 /// A tiny desktop that plays the whole story on loop: call → record → saved.
 private struct Demo: View {
     @State private var stage = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .top) {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
                 let t = Float(context.date.timeIntervalSinceReferenceDate * 0.25)
                 MeshGradient(width: 3, height: 3, points: [
                     [0, 0], [0.5, 0], [1, 0],
@@ -156,7 +157,7 @@ private struct Demo: View {
 
             capsule
                 .padding(.top, 30)
-                .animation(.spring(duration: 0.55, bounce: 0.3), value: stage)
+                .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.3), value: stage)
         }
         .environment(\.colorScheme, .dark)
         .task {
@@ -198,7 +199,7 @@ private struct Demo: View {
             }
             .transition(.blurReplace)
             .glassEffect(.regular, in: .capsule)
-            .transition(.scale(scale: 0.5, anchor: .top).combined(with: .opacity))
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.5, anchor: .top).combined(with: .opacity))
         }
     }
 }

@@ -5,6 +5,7 @@ struct LibraryView: View {
     @Bindable var model: AppModel
     @State private var search = ""
     @FocusState private var listFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let sections = self.sections
@@ -40,11 +41,11 @@ struct LibraryView: View {
             if let selected {
                 RecordingDetail(recording: selected, model: model)
                     .id("\(selected.id) \(selected.duration)") // duration is set when the file is finalized
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
             } else if model.store.recordings.isEmpty {
                 ContentUnavailableView {
                     Label("No Calls Yet", systemImage: "waveform")
-                        .symbolEffect(.variableColor.iterative.dimInactiveLayers, options: .repeating)
+                        .symbolEffect(.variableColor.iterative.dimInactiveLayers, options: .repeating, isActive: !reduceMotion)
                 } description: {
                     Text("Join a call, and Reprise offers to record it.")
                 }
@@ -354,6 +355,7 @@ private struct WaveformScrubber: View {
     let source: URL
     @State private var peaks: [Float] = []
     @State private var hover: CGFloat?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let bars = 120
 
     var body: some View {
@@ -367,7 +369,7 @@ private struct WaveformScrubber: View {
                     Rectangle().frame(width: geometry.size.width * progress)
                 }
             }
-            .animation(.easeOut(duration: 0.8), value: peaks.isEmpty)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.8), value: peaks.isEmpty)
             .overlay(alignment: .leading) {
                 if let hover {
                     Rectangle().fill(.primary.opacity(0.35)).frame(width: 1).offset(x: hover)
