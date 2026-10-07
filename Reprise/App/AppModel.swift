@@ -360,7 +360,12 @@ enum IslandState: Equatable {
 
     func delete(_ recording: Recording) {
         guard !isLive(recording) else { return } // stop first; otherwise capture continues into the Trash
+        let index = store.recordings.firstIndex { $0.id == recording.id } ?? 0
         store.delete(recording)
+        // The next call takes its place, as in Mail and Voice Memos.
+        if selection == recording.id, !store.recordings.contains(where: { $0.id == recording.id }) {
+            selection = (store.recordings.dropFirst(index).first ?? store.recordings.last)?.id
+        }
     }
 
     func transcribe(_ recording: Recording) {
