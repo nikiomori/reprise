@@ -59,7 +59,7 @@ private struct GeneralSettings: View {
                 }
                 Toggle(isOn: $callAppAudioOnly) {
                     Text("Record only the sound of the call app")
-                    Text("Music, videos, and notification sounds from other apps stay out of the audio. A recording you start yourself still gets all the sound of the Mac.")
+                    Text("Music, videos, and notification sounds from other apps stay out of the audio. A recording without a call still gets all the sound of the Mac.")
                 }
                 Toggle("Record the screen by default", isOn: $model.recordScreen)
                 Toggle("Show the floating pill while recording", isOn: $showPill)

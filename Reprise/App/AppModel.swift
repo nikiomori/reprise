@@ -283,9 +283,9 @@ enum IslandState: Equatable {
         return (Double(AudioConvertHostTimeToNanos(movie)) - Double(AudioConvertHostTimeToNanos(audio))) / 1e9
     }
 
-    /// Records the call Reprise is asking about, if any; otherwise a recording without a call.
+    /// Records the call Reprise is asking about, or the one going on; otherwise a recording without a call.
     func record() async {
-        if case .prompt(let app) = island { await startRecording(app: app) } else { await startRecording(app: nil) }
+        if case .prompt(let app) = island { await startRecording(app: app) } else { await startRecording(app: detector.active.first) }
     }
 
     func toggleRecording() {

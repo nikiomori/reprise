@@ -5,7 +5,7 @@ import AppIntents
 
 nonisolated struct StartRecordingIntent: AppIntent {
     static let title: LocalizedStringResource = "Start Recording"
-    static let description = IntentDescription("Records the call Reprise is asking about, or your microphone and the sound of the Mac.")
+    static let description = IntentDescription("Records the call going on, or your microphone and the sound of the Mac.")
 
     func perform() async throws -> some IntentResult {
         await AppModel.shared.record()
