@@ -51,6 +51,10 @@ enum IslandState: Equatable {
         guard !isTesting else { return } // no calls and no repairs: the tests drive the pieces themselves
         detector.start()
         store.deleteUnanswered()
+        // No call goes on through sleep, but the recording would after it: the room all night long.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [unowned self] _ in
+            Task { @MainActor in await stopRecording() }
+        }
         // Finish recordings that were cut short last time (crash, force quit, power loss).
         Task {
             for recording in store.recordings where FileManager.default.fileExists(atPath: recording.partialAudioURL.path) {
@@ -264,6 +268,7 @@ enum IslandState: Equatable {
     }
 
     private func finish(_ session: Session) async {
+        let ended = Date.now // the stop may only finish after the Mac wakes from sleep
         let audio = session.audio
         // Off the main thread: when Reprise is the last one on a Bluetooth mic, stopping waits for
         // the headphones to leave their call mode, which can take seconds.
@@ -271,7 +276,7 @@ enum IslandState: Equatable {
         if audio.hasHeardThem { UserDefaults.standard.set(true, forKey: "systemAudioHeard") } // Settings shows it as allowed
         await session.screen?.stop()
         var recording = session.recording
-        recording.duration = Date.now.timeIntervalSince(recording.startedAt)
+        recording.duration = ended.timeIntervalSince(recording.startedAt)
         recording.movieStart = recording.movieStart ?? Self.movieStart(in: session)
         recording = await store.finalize(recording)
         log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
