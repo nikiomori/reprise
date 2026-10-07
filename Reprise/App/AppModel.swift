@@ -100,7 +100,7 @@ enum IslandState: Equatable {
                     return show(.problem("Reprise needs microphone access"), for: .seconds(6))
                 }
                 recording = try store.create(app: app, at: .now)
-                audio = AudioRecorder(url: recording.partialAudioURL)
+                audio = AudioRecorder(url: recording.partialAudioURL, processes: tapped(app))
                 // Off the main thread: the first start blocks while macOS shows its permission prompt.
                 try await Task.detached { try audio.start() }.value
             }
@@ -157,12 +157,19 @@ enum IslandState: Equatable {
         }
     }
 
+    /// The call app's processes when Settings limit the audio to it. None, the whole Mac: a
+    /// recording without a call, or an app whose audio processes aren't there.
+    private func tapped(_ app: MeetingApp?) -> [AudioObjectID] {
+        guard let app, UserDefaults.standard.bool(forKey: "callAppAudioOnly") else { return [] }
+        return MeetingDetector.processes(of: app)
+    }
+
     /// Starts capturing as the prompt shows, so Record keeps the call from its first second.
     private func startPreroll(_ app: MeetingApp) {
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
         prerolling = Task {
             guard let recording = try? store.create(app: app, at: .now) else { return }
-            let audio = AudioRecorder(url: recording.partialAudioURL)
+            let audio = AudioRecorder(url: recording.partialAudioURL, processes: tapped(app))
             guard (try? await Task.detached { try audio.start() }.value) != nil else {
                 try? FileManager.default.removeItem(at: recording.folder)
                 return
@@ -232,12 +239,19 @@ enum IslandState: Equatable {
         await session.screen?.stop()
         var recording = session.recording
         recording.duration = Date.now.timeIntervalSince(recording.startedAt)
-        recording = await store.finalize(recording)
+        recording = await store.finalize(recording, callSoundFrom: Self.movieStart(in: session))
         log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
         show(.saved(recording), for: .seconds(5))
         if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey), TranscriptionSettings.service != nil {
             transcribe(recording)
         }
+    }
+
+    /// Seconds into the audio where the movie starts, when the audio has only the call app and
+    /// the movie, which always has the whole Mac, should get the audio's sound.
+    private static func movieStart(in session: Session) -> TimeInterval? {
+        guard !session.audio.processes.isEmpty, let audio = session.audio.startHostTime, let movie = session.screen?.startHostTime else { return nil }
+        return (Double(AudioConvertHostTimeToNanos(movie)) - Double(AudioConvertHostTimeToNanos(audio))) / 1e9
     }
 
     /// Records the call Reprise is asking about, if any; otherwise a recording without a call.

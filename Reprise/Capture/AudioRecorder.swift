@@ -2,13 +2,15 @@ import AVFoundation
 import CoreAudio
 import Synchronization
 
-/// Records the microphone and everything the Mac plays (except Reprise itself) into one AAC file.
+/// Records the microphone and everything the Mac plays (except Reprise itself) into one AAC file,
+/// or only what the given processes play.
 ///
 /// A private aggregate device combines the default input device with a system-wide
 /// Core Audio process tap, so both sources share one clock (the tap is drift-compensated).
 /// Each IO cycle is mixed down to mono and appended to the file.
 nonisolated final class AudioRecorder: @unchecked Sendable {
     private let url: URL
+    let processes: [AudioObjectID]
     private let queue = DispatchQueue(label: "dev.nikiomori.reprise.audio", qos: .userInteractive)
     private var tapID = AudioObjectID.unknown
     private var deviceID = AudioObjectID.unknown
@@ -20,14 +22,23 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
     private let written = Mutex(0)
+    private let started = Mutex<UInt64?>(nil)
+    private var latency: UInt64 = 0 // nanoseconds
 
-    init(url: URL) { self.url = url }
+    /// `processes` empty: the whole Mac.
+    init(url: URL, processes: [AudioObjectID] = []) {
+        self.url = url
+        self.processes = processes
+    }
 
     /// False while nothing but silence has arrived — usually a missing privacy permission.
     var hasHeardSound: Bool { heard.withLock { $0 } }
 
     /// Frames that made it into the file. Stuck while the device is gone or the disk is full.
     var framesWritten: Int { written.withLock { $0 } }
+
+    /// Host time when the sound in the file's first frame played, to line the screen recording up with it.
+    var startHostTime: UInt64? { started.withLock { $0 }.map { $0 - AudioConvertNanosToHostTime(latency) } }
 
     /// Peak level (0...1) since the last read; read it from the UI at frame rate.
     func readLevel() -> Float { peak.withLock { level in defer { level = 0 }; return level } }
@@ -43,8 +54,14 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         }
         micChannels = main.channelCount(scope: kAudioObjectPropertyScopeInput)
 
-        let tap = CATapDescription(monoGlobalTapButExcludeProcesses: [])
-        tap.bundleIDs = [Bundle.main.bundleIdentifier ?? ""]
+        let tap: CATapDescription
+        if processes.isEmpty {
+            tap = CATapDescription(monoGlobalTapButExcludeProcesses: [])
+            tap.bundleIDs = [Bundle.main.bundleIdentifier ?? ""]
+        } else {
+            tap = CATapDescription(monoMixdownOfProcesses: processes)
+            tap.isProcessRestoreEnabled = true // an audio helper that restarts mid-call comes back
+        }
         tap.isPrivate = true
         try check("capture system audio", AudioHardwareCreateProcessTap(tap, &tapID))
 
@@ -62,6 +79,9 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             try check("create the recording device", AudioHardwareCreateAggregateDevice(description as CFDictionary, &deviceID))
 
             let rate = deviceID.get(kAudioDevicePropertyNominalSampleRate, Float64(48_000))
+            // The drift-compensated tap hands over the Mac's sound late: 2399 frames, 50 ms, on a MacBook.
+            let frames = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
+            latency = UInt64(Double(frames) / rate * 1e9)
             file = try AVAudioFile(
                 forWriting: url,
                 settings: [
@@ -75,8 +95,8 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             )
             mix = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!, frameCapacity: 16_384)
 
-            try check("start recording", AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, _, _, _ in
-                self?.write(input)
+            try check("start recording", AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, inputTime, _, _ in
+                self?.write(input, at: inputTime.pointee.mHostTime)
             })
             try check("start recording", AudioDeviceStart(deviceID, procID))
         } catch {
@@ -99,7 +119,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         if tapID != .unknown { AudioHardwareDestroyProcessTap(tapID); tapID = .unknown }
     }
 
-    private func write(_ input: UnsafePointer<AudioBufferList>) {
+    private func write(_ input: UnsafePointer<AudioBufferList>, at hostTime: UInt64) {
         guard let file, let mix, let out = mix.floatChannelData?[0] else { return }
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let (frames, you, them) = Self.mixDown(buffers, micChannels: micChannels, into: out, capacity: Int(mix.frameCapacity))
@@ -110,6 +130,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         if loudest > 0 { heard.withLock { $0 = true } }
         mix.frameLength = AVAudioFrameCount(frames)
         guard (try? file.write(from: mix)) != nil else { return }
+        started.withLock { $0 = $0 ?? hostTime }
         written.withLock { $0 += frames }
     }
 

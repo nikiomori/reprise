@@ -205,6 +205,15 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         return (audible, microphone)
     }
 
+    /// The app's audio processes, helpers included: what a tap needs to record only that app.
+    static func processes(of app: MeetingApp) -> [AudioObjectID] {
+        let me = getpid()
+        return AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter { process in
+            let pid = process.get(kAudioProcessPropertyPID, pid_t(-1))
+            return pid != me && Self.app(of: process, pid: pid) == app
+        }
+    }
+
     private static func app(of process: AudioObjectID, pid: pid_t) -> MeetingApp? {
         // Helpers share the process group of the app that launched them, so the group
         // leader tells Dia's "company.thebrowser.browser.helper" apart from Arc's.

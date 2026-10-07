@@ -19,6 +19,7 @@ private struct GeneralSettings: View {
     @Bindable private var model = AppModel.shared
     @AppStorage("showRecordingPill") private var showPill = true
     @AppStorage("recordFromStart") private var recordFromStart = false
+    @AppStorage("callAppAudioOnly") private var callAppAudioOnly = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screen = ScreenRecorder.hasPermission
@@ -35,6 +36,10 @@ private struct GeneralSettings: View {
                 Toggle(isOn: $recordFromStart) {
                     Text("Record calls from the first second")
                     Text("While Reprise asks, it already records. Select Record to keep the call from the start. If you don't, Reprise deletes that audio.")
+                }
+                Toggle(isOn: $callAppAudioOnly) {
+                    Text("Record only the sound of the call app")
+                    Text("Music, videos, and notification sounds from other apps stay out of the audio. A recording you start yourself still gets all the sound of the Mac.")
                 }
             }
             Section("Recordings") {

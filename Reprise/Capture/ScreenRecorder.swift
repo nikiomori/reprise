@@ -6,6 +6,10 @@ import Synchronization
 nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @unchecked Sendable {
     private var stream: SCStream?
     private let state = Mutex(State.recording)
+    private let started = Mutex<UInt64?>(nil)
+
+    /// Host time the movie starts at.
+    var startHostTime: UInt64? { started.withLock { $0 } }
 
     private enum State {
         case recording, finished
@@ -42,6 +46,8 @@ nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @un
         config.height = Int(size.height) & ~1
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         config.showsCursor = true
+        // All the sound of the Mac, even with "only the call app" on: a filter that limits the sound
+        // to one app limits the picture to its windows too. The store swaps in the call's sound on stop.
         config.capturesAudio = true
         config.excludesCurrentProcessAudio = true
         config.captureMicrophone = true
@@ -73,6 +79,7 @@ nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @un
         }
     }
 
+    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) { started.withLock { $0 = mach_absolute_time() } }
     func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) { finish() }
     func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: any Error) { finish() }
 

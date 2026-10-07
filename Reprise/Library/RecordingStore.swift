@@ -90,12 +90,16 @@ struct Recording: Codable, Identifiable, Hashable {
     }
 
     /// Repackages the crash-safe ADTS stream into a regular `.m4a` (no re-encoding) and saves.
+    /// `callSoundFrom`: seconds into the audio where the movie starts, to give the movie the audio's sound.
     @discardableResult
-    func finalize(_ recording: Recording) async -> Recording {
+    func finalize(_ recording: Recording, callSoundFrom offset: TimeInterval? = nil) async -> Recording {
         var recording = recording
         if FileManager.default.fileExists(atPath: recording.partialAudioURL.path),
            (try? await Self.remux(recording.partialAudioURL, to: recording.finalAudioURL)) != nil {
             try? FileManager.default.removeItem(at: recording.partialAudioURL)
+        }
+        if recording.hasVideo, let offset, (try? await Self.replaceSound(of: recording.videoURL, with: recording.finalAudioURL, from: offset)) == nil {
+            log.error("The movie keeps the sound of the whole Mac: its sound couldn't be replaced")
         }
         if recording.duration == 0, let seconds = try? await AVURLAsset(url: recording.audioURL).load(.duration).seconds {
             recording.duration = seconds // a recording cut short by a crash
@@ -115,6 +119,31 @@ struct Recording: Codable, Identifiable, Hashable {
             throw CocoaError(.fileWriteUnknown)
         }
         try await export.export(to: destination, as: .m4a)
+    }
+
+    /// Gives the movie the sound of `audio` from `offset` seconds on, without re-encoding.
+    nonisolated private static func replaceSound(of movie: URL, with audio: URL, from offset: TimeInterval) async throws {
+        let video = AVURLAsset(url: movie), sound = AVURLAsset(url: audio)
+        guard let picture = try await video.loadTracks(withMediaType: .video).first,
+              let voice = try await sound.loadTracks(withMediaType: .audio).first else { throw CocoaError(.fileReadCorruptFile) }
+        let length = try await video.load(.duration)
+        let start = CMTime(seconds: max(0, offset), preferredTimescale: 48_000) // the audio always starts first
+        let available = try await sound.load(.duration) - start
+        guard available > .zero else { throw CocoaError(.fileReadCorruptFile) }
+
+        let composition = AVMutableComposition()
+        try composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)?
+            .insertTimeRange(try await picture.load(.timeRange), of: picture, at: .zero)
+        try composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)?
+            .insertTimeRange(CMTimeRange(start: start, duration: min(length, available)), of: voice, at: .zero)
+
+        let temporary = movie.deletingLastPathComponent().appending(path: "screen-call.mov")
+        try? FileManager.default.removeItem(at: temporary)
+        guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try await export.export(to: temporary, as: .mov)
+        _ = try FileManager.default.replaceItemAt(movie, withItemAt: temporary)
     }
 
     /// Moves the recording to the Trash, so it can be recovered.
