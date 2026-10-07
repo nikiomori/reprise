@@ -6,6 +6,9 @@ struct MenuBarView: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    /// For Recent's "2 hours ago". The panel stays alive between openings, so it's set as it opens:
+    /// nothing ticks while it's closed.
+    @State private var now = Date.now
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -36,7 +39,7 @@ struct MenuBarView: View {
                     .padding(.horizontal, 10)
                     .padding(.bottom, 2)
                 ForEach(recent) { recording in
-                    Button { open(recording) } label: { RecentRow(recording: recording, isLive: model.isLive(recording)) }
+                    Button { open(recording) } label: { RecentRow(recording: recording, isLive: model.isLive(recording), now: now) }
                 }
             }
 
@@ -51,6 +54,7 @@ struct MenuBarView: View {
         .buttonStyle(RowHighlightButtonStyle())
         .padding(5)
         .frame(width: 300)
+        .onAppear { now = .now }
     }
 
     private func open(_ recording: Recording?) {
@@ -155,14 +159,15 @@ private struct MenuDivider: View {
 private struct RecentRow: View {
     let recording: Recording
     let isLive: Bool
+    let now: Date
 
     var body: some View {
         HStack(spacing: 10) {
             AppIcon(app: recording.app, size: 26)
             VStack(alignment: .leading, spacing: 0) {
                 Text(recording.title).lineLimit(1)
-                // Its length is only known once it's saved.
-                Text("\(recording.startedAt.formatted(.relative(presentation: .named))) · \(isLive ? Text("Recording").foregroundStyle(.red) : Text(recording.duration.clock))")
+                // Its length is only known once it's saved. One started since the panel opened reads "now", not "in 5 seconds".
+                Text("\(max(now, recording.startedAt).formatted(Date.AnchoredRelativeFormatStyle(anchor: recording.startedAt, presentation: .named))) · \(isLive ? Text("Recording").foregroundStyle(.red) : Text(recording.duration.clock))")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
