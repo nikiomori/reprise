@@ -5,6 +5,7 @@ import SwiftUI
 struct MenuBarView: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -56,6 +57,7 @@ struct MenuBarView: View {
         if let recording { model.selection = recording.id }
         openWindow(id: "library")
         NSApp.activate()
+        dismiss() // as a menu closes once an item is chosen
     }
 }
 
