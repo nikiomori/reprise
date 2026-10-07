@@ -100,6 +100,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
+    /// Opened again from Finder or Spotlight while running: show a window, as the menu bar item
+    /// may be out of reach (behind the notch, or hidden in System Settings). Not `hasVisibleWindows`,
+    /// which may count the recording pill.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !sender.windows.contains(where: { $0.isVisible && $0.styleMask.contains(.titled) }) {
+            NotificationCenter.default.post(name: .openRepriseWindow, object: UserDefaults.standard.bool(forKey: "onboarded") ? "library" : "welcome")
+        }
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         AppModel.shared.discardPrerollBeforeQuit()
     }
