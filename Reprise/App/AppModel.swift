@@ -330,6 +330,16 @@ enum IslandState: Equatable {
     private func show(_ state: IslandState, for duration: Duration? = nil) {
         islandTimeout?.cancel()
         island = state
+        // The panel never takes focus, so VoiceOver wouldn't notice it.
+        let spoken: String? = switch state {
+        case .prompt(let app): "\(app.name): Record this call?"
+        case .problem(let message): message
+        default: nil
+        }
+        if let spoken {
+            NSAccessibility.post(element: NSApplication.shared, notification: .announcementRequested,
+                                 userInfo: [.announcement: spoken, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        }
         guard let duration else { return }
         islandTimeout = Task {
             try? await Task.sleep(for: duration)

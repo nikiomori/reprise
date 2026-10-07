@@ -139,6 +139,7 @@ private struct ChipToggleStyle: ToggleStyle {
             }
         }
         .accessibilityValue(configuration.isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isToggle)
         .animation(.smooth(duration: 0.2), value: configuration.isOn)
     }
 }

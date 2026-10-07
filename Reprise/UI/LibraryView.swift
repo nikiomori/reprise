@@ -203,11 +203,12 @@ private struct RecordingDetail: View {
                         .onChange(of: titleFocused) { if !titleFocused { saveTitle() } }
                         .onExitCommand { title = recording.title; renaming = false }
                 } else {
-                    Text(title)
-                        .font(.system(.title, weight: .bold))
-                        .onTapGesture { renaming = true }
-                        .pointerStyle(.horizontalText) // reads as editable, like a name in Finder
-                        .help("Click to rename")
+                    Button { renaming = true } label: { // a button, so the keyboard and VoiceOver reach it too
+                        Text(title).font(.system(.title, weight: .bold))
+                    }
+                    .buttonStyle(.plain)
+                    .pointerStyle(.horizontalText) // reads as editable, like a name in Finder
+                    .help("Click to rename")
                 }
                 Text([recording.app?.name ?? "Recording", recording.startedAt.formatted(date: .long, time: .shortened), model.isLive(recording) ? nil : recording.duration.clock].compactMap(\.self).joined(separator: " · "))
                     .foregroundStyle(.secondary)
