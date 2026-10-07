@@ -21,6 +21,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let peak = Mutex<Float>(0)
     private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
+    private let heardThem = Mutex(false)
     private let written = Mutex(0)
     private let started = Mutex<UInt64?>(nil)
     private var latency: UInt64 = 0 // nanoseconds
@@ -33,6 +34,9 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
 
     /// False while nothing but silence has arrived — usually a missing privacy permission.
     var hasHeardSound: Bool { heard.withLock { $0 } }
+
+    /// True once the Mac's sound came through — which macOS only allows with the system audio permission.
+    var hasHeardThem: Bool { heardThem.withLock { $0 } }
 
     /// Frames that made it into the file. Stuck while the device is gone or the disk is full.
     var framesWritten: Int { written.withLock { $0 } }
@@ -128,6 +132,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         peak.withLock { $0 = max($0, loudest) }
         voices.withLock { $0 = (max($0.you, you), max($0.them, them)) }
         if loudest > 0 { heard.withLock { $0 = true } }
+        if them > 0 { heardThem.withLock { $0 = true } }
         mix.frameLength = AVAudioFrameCount(frames)
         guard (try? file.write(from: mix)) != nil else { return }
         started.withLock { $0 = $0 ?? hostTime }

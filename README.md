@@ -131,11 +131,11 @@ If Reprise asks to record a call, **Start Recording** records this call.
 ### Set a rule for a call app
 
 1. Open **Settings > Apps**.
-2. For each app, select **Ask**, **Always record**, or **Ignore**.
+2. For each app, select **Ask**, **Always Record**, or **Ignore**.
 
-You can also right-click the prompt and select **Always Record** or **Never Ask**.
+You can also right-click the prompt and select **Always Record** or **Ignore**.
 
-Reprise also finds other apps that use the microphone for more than 10 seconds. These apps show in **Settings > Apps** below the list.
+Reprise also finds other apps that use the microphone for more than 10 seconds. These apps show in **Settings > Apps** under **Other Apps**.
 
 ### Move or hide the pill
 
@@ -169,7 +169,7 @@ To connect a service:
 1. Open **Settings > Transcription**.
 2. Select a service.
 3. Enter your API key. A local server does not need an API key.
-4. Optional: enter a language code, for example `en` or `ru`.
+4. Optional: select the language of your calls. **Automatic** lets the service detect it.
 5. Optional: select **Transcribe calls automatically**.
 
 Reprise divides long recordings into parts of 10 minutes. This keeps each part below the limits of the services. Reprise keeps the API key in the macOS Keychain.

@@ -98,11 +98,17 @@ struct IslandView: View {
                     case .saved(let recording):
                         SavedContent(recording: recording)
                     case .problem(let message):
-                        Label(message, systemImage: "exclamationmark.triangle.fill")
-                            .symbolRenderingMode(.multicolor)
-                            .font(.callout.weight(.medium))
-                            .padding(.horizontal, 18)
-                            .frame(height: 44)
+                        let label = Label(message, systemImage: "exclamationmark.triangle.fill")
+                        // Long warnings wrap onto a second line rather than run past the panel's edges.
+                        ViewThatFits(in: .horizontal) {
+                            label.fixedSize()
+                            label.lineLimit(2).frame(width: 400)
+                        }
+                        .symbolRenderingMode(.multicolor)
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 44)
                     }
                 }
                 .transition(.blurReplace)
@@ -180,6 +186,7 @@ private struct PromptContent: View {
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .help("Not this time")
+            .accessibilityLabel("Don't Record")
         }
         .padding(.leading, 10)
         .padding(.trailing, 8)
@@ -190,7 +197,7 @@ private struct PromptContent: View {
                 app.rule = .always
                 Task { await model.startRecording(app: app) }
             }
-            Button("Never Ask for \(app.name)", systemImage: "nosign") {
+            Button("Ignore \(app.name)", systemImage: "nosign") {
                 app.rule = .never
                 model.dismissPrompt()
             }
@@ -257,6 +264,7 @@ private struct RecordingContent: View {
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
                 .help("Stop recording")
+                .accessibilityLabel("Stop Recording")
                 .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
         }
@@ -304,13 +312,17 @@ private struct SavedContent: View {
                 .onAppear { drawn = true }
             VStack(alignment: .leading, spacing: 0) {
                 Text("Saved").font(.headline)
-                Text(recording.duration.clock).font(.caption).foregroundStyle(.secondary)
+                // What was saved, not just a number that could be a time of day.
+                Text("\(recording.title) · \(recording.duration.clock)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             Button("Open") {
                 AppModel.shared.selection = recording.id
                 NotificationCenter.default.post(name: .openRepriseWindow, object: "library")
             }
             .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
         }
         .padding(.leading, 14)
         .padding(.trailing, 6)

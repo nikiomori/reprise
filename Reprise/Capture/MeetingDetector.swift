@@ -31,7 +31,7 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         var title: String {
             switch self {
             case .ask: "Ask"
-            case .always: "Always record"
+            case .always: "Always Record"
             case .never: "Ignore"
             }
         }

@@ -236,6 +236,7 @@ enum IslandState: Equatable {
         // Off the main thread: when Reprise is the last one on a Bluetooth mic, stopping waits for
         // the headphones to leave their call mode, which can take seconds.
         await Task.detached { audio.stop() }.value
+        if audio.hasHeardThem { UserDefaults.standard.set(true, forKey: "systemAudioHeard") } // Settings shows it as allowed
         await session.screen?.stop()
         var recording = session.recording
         recording.duration = Date.now.timeIntervalSince(recording.startedAt)

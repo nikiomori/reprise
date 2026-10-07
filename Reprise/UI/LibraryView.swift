@@ -31,14 +31,7 @@ struct LibraryView: View {
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
             .onDeleteCommand { if let selected { model.delete(selected) } }
             .overlay {
-                if model.store.recordings.isEmpty {
-                    ContentUnavailableView {
-                        Label("No calls yet", systemImage: "waveform")
-                            .symbolEffect(.variableColor.iterative.dimInactiveLayers, options: .repeating)
-                    } description: {
-                        Text("Join a call and Reprise will offer to record it.")
-                    }
-                } else if sections.isEmpty {
+                if !model.store.recordings.isEmpty, sections.isEmpty {
                     ContentUnavailableView.search(text: search)
                 }
             }
@@ -47,8 +40,15 @@ struct LibraryView: View {
                 RecordingDetail(recording: selected, model: model)
                     .id("\(selected.id) \(selected.duration)") // duration is set when the file is finalized
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            } else if model.store.recordings.isEmpty {
+                ContentUnavailableView {
+                    Label("No Calls Yet", systemImage: "waveform")
+                        .symbolEffect(.variableColor.iterative.dimInactiveLayers, options: .repeating)
+                } description: {
+                    Text("Join a call, and Reprise offers to record it.")
+                }
             } else {
-                ContentUnavailableView("Pick a call", systemImage: "play.square.stack", description: Text("Recordings you make show up on the left."))
+                ContentUnavailableView("No Call Selected", systemImage: "waveform", description: Text("Select a call to play it."))
             }
         }
         .animation(.smooth(duration: 0.25), value: model.selection)
@@ -98,16 +98,15 @@ private struct RecordingRow: View {
             AppIcon(app: recording.app, size: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(recording.title).lineLimit(1)
-                HStack(spacing: 4) {
-                    Text(recording.startedAt, format: .dateTime.hour().minute())
-                    Text("·")
+                Group {
                     if isLive {
-                        Text("Recording").foregroundStyle(.red)
+                        Text("\(recording.startedAt, format: .dateTime.hour().minute()) · \(Text("Recording").foregroundStyle(.red))")
                     } else {
-                        Text(recording.duration.clock).monospacedDigit()
+                        Text("\(recording.startedAt, format: .dateTime.hour().minute()) · \(recording.duration.clock)")
                     }
                 }
                 .font(.caption)
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
@@ -140,21 +139,26 @@ private struct RecordingDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
-                if recording.hasVideo {
-                    VideoPlayer(player: player.avPlayer)
-                        .aspectRatio(16 / 10, contentMode: .fit)
-                        .clipShape(.rect(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+                if model.isLive(recording) {
+                    LiveCard(model: model, since: recording.startedAt)
+                } else {
+                    if recording.hasVideo {
+                        VideoPlayer(player: player.avPlayer)
+                            .aspectRatio(16 / 10, contentMode: .fit)
+                            .clipShape(.rect(cornerRadius: 16))
+                            .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+                    }
+                    PlayerCard(player: player, waveformSource: recording.audioURL)
+                        .tint(.primary)
+                    TranscriptSection(recording: recording, model: model)
                 }
-                PlayerCard(player: player, waveformSource: recording.audioURL)
-                    .tint(.primary)
-                TranscriptSection(recording: recording, model: model)
             }
             .padding(32)
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .toolbar {
+            ToolbarSpacer(.fixed) // this call's actions apart from Record, which isn't about it
             ToolbarItemGroup {
                 ShareLink(item: recording.hasVideo ? recording.videoURL : recording.audioURL)
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
@@ -190,12 +194,37 @@ private struct RecordingDetail: View {
                     Text(title)
                         .font(.system(.title, weight: .bold))
                         .onTapGesture { renaming = true }
+                        .pointerStyle(.horizontalText) // reads as editable, like a name in Finder
                         .help("Click to rename")
                 }
-                Text("\(recording.app?.name ?? "Recording") · \(recording.startedAt.formatted(date: .long, time: .shortened)) · \(recording.duration.clock)")
+                Text([recording.app?.name ?? "Recording", recording.startedAt.formatted(date: .long, time: .shortened), model.isLive(recording) ? nil : recording.duration.clock].compactMap(\.self).joined(separator: " · "))
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// A call still being recorded has nothing to play yet.
+private struct LiveCard: View {
+    let model: AppModel
+    let since: Date
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "record.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Recording").font(.headline)
+                Text("You can play the call after it ends.").font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            ElapsedTime(since: since).font(.title3.weight(.semibold))
+            Button("Stop", systemImage: "stop.fill") { Task { await model.stopRecording() } }
+                .buttonStyle(.glass)
+        }
+        .padding(20)
+        .background(.background.secondary, in: .rect(cornerRadius: 22))
     }
 }
 
@@ -246,14 +275,23 @@ private struct PlayerCard: View {
     let waveformSource: URL
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             WaveformScrubber(player: player, source: waveformSource)
                 .frame(height: 64)
+            // Elapsed and remaining under the wave, like Music and Voice Memos.
             HStack {
-                Text(player.time.clock).monospacedDigit()
+                Text(player.time.clock)
                 Spacer()
-                Button { player.skip(-15) } label: { Image(systemName: "gobackward.15") }
+                Text("−\(max(0, player.duration - player.time).clock)")
+            }
+            .font(.caption)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            HStack(spacing: 14) {
+                Button("Back 15 Seconds", systemImage: "gobackward.15") { player.skip(-15) }
+                    .labelStyle(.iconOnly)
                     .buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large)
+                    .help("Back 15 seconds")
                 Button(action: player.toggle) {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title2)
@@ -264,9 +302,15 @@ private struct PlayerCard: View {
                 .buttonBorderShape(.circle)
                 .controlSize(.extraLarge)
                 .keyboardShortcut(.space, modifiers: [])
-                Button { player.skip(15) } label: { Image(systemName: "goforward.15") }
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+                Button("Forward 15 Seconds", systemImage: "goforward.15") { player.skip(15) }
+                    .labelStyle(.iconOnly)
                     .buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large)
-                Spacer()
+                    .help("Forward 15 seconds")
+            }
+            // The speed rides on the side so play stays in the true center.
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .trailing) {
                 Menu {
                     Picker("Speed", selection: Bindable(player).rate) {
                         ForEach([0.75, 1, 1.25, 1.5, 2] as [Float], id: \.self) { Text("\($0.formatted())×").tag($0) }
@@ -277,10 +321,10 @@ private struct PlayerCard: View {
                 }
                 .menuStyle(.button)
                 .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
                 .fixedSize()
-                Text(player.duration.clock).monospacedDigit().foregroundStyle(.secondary)
+                .help("Playback speed")
             }
-            .font(.callout)
         }
         .padding(20)
         .background(.background.secondary, in: .rect(cornerRadius: 22))
@@ -318,6 +362,12 @@ private struct WaveformScrubber: View {
             .gesture(DragGesture(minimumDistance: 0).onChanged { value in
                 player.seek(to: player.duration * min(max(0, value.location.x / geometry.size.width), 1))
             })
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Playback position")
+        .accessibilityValue("\(player.time.clock) of \(player.duration.clock)")
+        .accessibilityAdjustableAction { direction in
+            player.skip(direction == .increment ? 15 : -15)
         }
         .task { peaks = await Waveform.peaks(of: source, count: bars) }
     }

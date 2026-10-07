@@ -9,9 +9,9 @@ struct SettingsView: View {
             Tab("Apps", systemImage: "app.badge.checkmark") { AppsSettings() }
             Tab("Transcription", systemImage: "text.bubble") { TranscriptionSettingsView() }
         }
-        .scenePadding()
         .frame(width: 540)
-        .frame(minHeight: 440)
+        .frame(maxHeight: 720) // a long list of apps scrolls instead of outgrowing the screen
+        .fixedSize(horizontal: false, vertical: true) // each tab as tall as its content, like Apple's settings windows
     }
 }
 
@@ -20,19 +20,38 @@ private struct GeneralSettings: View {
     @AppStorage("showRecordingPill") private var showPill = true
     @AppStorage("recordFromStart") private var recordFromStart = false
     @AppStorage("callAppAudioOnly") private var callAppAudioOnly = false
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @AppStorage("screenAccessRequested") private var screenRequested = false
+    @AppStorage("systemAudioHeard") private var systemAudioHeard = false
+    @State private var loginItem = SMAppService.mainApp.status
     @State private var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screen = ScreenRecorder.hasPermission
 
     var body: some View {
         Form {
             Section {
-                Toggle("Open Reprise at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, on in
-                        try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+                // The real state, not the last click: registering can fail or wait for approval.
+                Toggle("Open Reprise at login", isOn: Binding {
+                    loginItem == .enabled
+                } set: { on in
+                    try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+                    loginItem = SMAppService.mainApp.status
+                })
+                if loginItem == .requiresApproval {
+                    LabeledContent {
+                        Button("Open Settings") { SMAppService.openSystemSettingsLoginItems() }
+                    } label: {
+                        Text("Waiting for your approval")
+                        Text("Allow Reprise in Login Items.")
                     }
-                Toggle("Record the screen by default", isOn: $model.recordScreen)
-                Toggle("Show the floating pill while recording", isOn: $showPill)
+                }
+                LabeledContent {
+                    Button("Show in Finder") { AppModel.shared.store.revealInFinder() }
+                } label: {
+                    Text("Saved in")
+                    Text(RecordingStore.root.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                }
+            }
+            Section("Recording") {
                 Toggle(isOn: $recordFromStart) {
                     Text("Record calls from the first second")
                     Text("While Reprise asks, it already records. Select Record to keep the call from the start. If you don't, Reprise deletes that audio.")
@@ -41,20 +60,24 @@ private struct GeneralSettings: View {
                     Text("Record only the sound of the call app")
                     Text("Music, videos, and notification sounds from other apps stay out of the audio. A recording you start yourself still gets all the sound of the Mac.")
                 }
-            }
-            Section("Recordings") {
-                LabeledContent("Saved in") {
-                    Button(RecordingStore.root.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
-                        AppModel.shared.store.revealInFinder()
-                    }
-                    .buttonStyle(.link)
-                }
+                Toggle("Record the screen by default", isOn: $model.recordScreen)
+                Toggle("Show the floating pill while recording", isOn: $showPill)
             }
             Section("Permissions") {
-                PermissionRow(title: "Microphone", detail: "Your side of the call", granted: microphone == .authorized, pane: "Privacy_Microphone")
-                PermissionRow(title: "System audio", detail: "Everyone else — macOS asks the first time you record", granted: nil, pane: "Privacy_AudioCapture")
-                PermissionRow(title: "Screen recording", detail: "Only if you record the screen", granted: screen, pane: "Privacy_ScreenCapture")
-                if !screen, UserDefaults.standard.bool(forKey: "screenAccessRequested") {
+                PermissionRow(title: "Microphone", detail: "Your side of the call", granted: microphone == .authorized, pane: "Privacy_Microphone",
+                              allow: microphone != .notDetermined ? nil : {
+                                  _ = await AVCaptureDevice.requestAccess(for: .audio)
+                                  microphone = AVCaptureDevice.authorizationStatus(for: .audio)
+                              })
+                // macOS can't be asked about this one; a recording that heard the other side proves it.
+                PermissionRow(title: "System audio", detail: systemAudioHeard ? "Everyone else on the call" : "Everyone else — macOS asks the first time you record",
+                              granted: systemAudioHeard ? true : nil, pane: "Privacy_AudioCapture")
+                PermissionRow(title: "Screen recording", detail: "Only if you record the screen", granted: screen, pane: "Privacy_ScreenCapture",
+                              allow: screenRequested ? nil : {
+                                  screenRequested = true
+                                  CGRequestScreenCaptureAccess()
+                              })
+                if !screen, screenRequested {
                     LabeledContent("Already switched it on?") {
                         Button("Relaunch Reprise", action: relaunch)
                     }
@@ -63,6 +86,7 @@ private struct GeneralSettings: View {
         }
         .formStyle(.grouped)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem = SMAppService.mainApp.status
             microphone = AVCaptureDevice.authorizationStatus(for: .audio)
             screen = ScreenRecorder.hasPermission
         }
@@ -74,11 +98,18 @@ struct PermissionRow: View {
     let detail: String
     let granted: Bool?
     let pane: String
+    /// Asks macOS directly while it still can; once someone has answered, only System Settings changes it.
+    var allow: (() async -> Void)?
 
     var body: some View {
         LabeledContent {
             if granted == true {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).imageScale(.large)
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .imageScale(.large)
+                    .accessibilityLabel("Allowed")
+            } else if let allow {
+                Button("Allow") { Task { await allow() } }
             } else {
                 Button("Open Settings") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
@@ -92,22 +123,41 @@ struct PermissionRow: View {
 }
 
 private struct AppsSettings: View {
+    private let installed = MeetingApp.known.filter(\.isInstalled)
+
     var body: some View {
         Form {
-            Section {
-                ForEach(MeetingApp.known.filter(\.isInstalled)) { app in
-                    RuleRow(app: app)
+            let callApps = installed.filter { !$0.isBrowser }
+            if !callApps.isEmpty {
+                Section {
+                    ForEach(callApps) { RuleRow(app: $0) }
+                } header: {
+                    Text("Call Apps")
+                } footer: {
+                    Text("Reprise notices a call when one of these apps starts using the microphone.")
+                        .foregroundStyle(.secondary)
                 }
-            } header: {
-                Text("When a call starts in…")
-            } footer: {
-                Text("Browsers cover Google Meet and other web calls. Reprise notices a call when an app starts using the microphone.")
-                    .foregroundStyle(.secondary)
+            }
+            let browsers = installed.filter(\.isBrowser)
+            if !browsers.isEmpty {
+                Section {
+                    ForEach(browsers) { RuleRow(app: $0) }
+                } header: {
+                    Text("Browsers")
+                } footer: {
+                    Text("For Google Meet and other calls on the web.")
+                        .foregroundStyle(.secondary)
+                }
             }
             let others = MeetingApp.seen
             if !others.isEmpty {
-                Section("Other apps that used the microphone") {
+                Section {
                     ForEach(others) { RuleRow(app: $0) }
+                } header: {
+                    Text("Other Apps")
+                } footer: {
+                    Text("Apps that used the microphone for more than 10 seconds.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -143,26 +193,48 @@ private struct TranscriptionSettingsView: View {
     @AppStorage(TranscriptionSettings.autoKey) private var auto = false
     @State private var apiKey = TranscriptionSettings.apiKey ?? ""
 
+    /// Two-letter codes, which is what Whisper-style services take, named in the user's language.
+    private static let languages = Locale.LanguageCode.isoLanguageCodes
+        .filter { $0.identifier.count == 2 }
+        .compactMap { code in Locale.current.localizedString(forLanguageCode: code.identifier).map { (code: code.identifier, name: $0) } }
+        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
     var body: some View {
         Form {
             Section {
                 Picker("Service", selection: preset) {
                     Text("None").tag("None")
+                    Divider()
                     ForEach(TranscriptionService.presets, id: \.name) { Text($0.name).tag($0.name) }
+                    Divider()
                     Text("Custom").tag("Custom")
                 }
-                if !baseURL.isEmpty || preset.wrappedValue == "Custom" {
+            } footer: {
+                Text("Reprise doesn't transcribe on the Mac yet. It sends the audio to the service you choose. Any OpenAI-compatible service works, including a Whisper server on your own Mac, so the audio never leaves it.")
+                    .foregroundStyle(.secondary)
+            }
+            if !baseURL.isEmpty {
+                Section {
                     TextField("Server", text: $baseURL, prompt: Text("https://api.example.com/v1"))
                     TextField("Model", text: $model)
-                    SecureField("API key", text: $apiKey, prompt: Text("Not needed for local servers"))
+                    SecureField("API key", text: $apiKey, prompt: Text("Required, except for local servers"))
                         .onChange(of: apiKey) { TranscriptionSettings.apiKey = apiKey }
                         .onChange(of: baseURL) { apiKey = TranscriptionSettings.apiKey ?? "" }
-                    TextField("Language", text: $language, prompt: Text("Automatic, or a code like en or ru"))
+                } footer: {
+                    Text("The API key is kept in your Keychain.")
+                        .foregroundStyle(.secondary)
+                }
+                Section {
+                    Picker("Language", selection: $language) {
+                        Text("Automatic").tag("")
+                        Divider()
+                        if !Self.languages.contains(where: { $0.code == language }), !language.isEmpty {
+                            Text(language).tag(language) // typed in by an earlier version
+                        }
+                        ForEach(Self.languages, id: \.code) { Text($0.name).tag($0.code) }
+                    }
                     Toggle("Transcribe calls automatically", isOn: $auto)
                 }
-            } footer: {
-                Text("Reprise doesn't transcribe on its own yet. Any service with an OpenAI-compatible `/audio/transcriptions` endpoint works — including a whisper server on your own Mac, so audio never leaves it. The API key is kept in your Keychain.")
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
