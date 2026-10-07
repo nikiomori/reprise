@@ -100,6 +100,11 @@ private struct RecordingRow: View {
     let isLive: Bool
 
     var body: some View {
+        // Into Mail, Finder or another app, as from Finder; not while it's still being written.
+        if isLive { row } else { row.draggable(recording.hasVideo ? recording.videoURL : recording.audioURL) }
+    }
+
+    private var row: some View {
         HStack(spacing: 10) {
             AppIcon(app: recording.app, size: 30)
             VStack(alignment: .leading, spacing: 2) {
