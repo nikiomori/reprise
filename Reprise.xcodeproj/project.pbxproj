@@ -15,6 +15,7 @@
 		42E4BDA9691FCB6468BC2149 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930066FC9B07075718F9F50C /* AppModel.swift */; };
 		591DB9213208ADFD9A881DC1 /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9043239B474E12ECE71F5FD /* MeetingDetector.swift */; };
 		7338E93501383CEC6BE17B3C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 892A0B78D5E7B007506D76FF /* SettingsView.swift */; };
+		781B3558C56B51B3FC2C62BA /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C11AE3AAEAC84F35BDD60BA8 /* AVKit.framework */; };
 		796A40F671A89D120CEDA539 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7DEFA51BD022745B069C07 /* LibraryView.swift */; };
 		7FAAF0B280BA1AADCD3A49A6 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91D5314F710C5FABF64E3E34 /* MenuBarView.swift */; };
 		823A46C262162C27111ED865 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5EA41968814ACF5C3D8CFAC /* AudioRecorder.swift */; };
@@ -55,6 +56,7 @@
 		B5EA41968814ACF5C3D8CFAC /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		B9043239B474E12ECE71F5FD /* MeetingDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetector.swift; sourceTree = "<group>"; };
 		BF6805715BFAFB008B2F07E3 /* RepriseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepriseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C11AE3AAEAC84F35BDD60BA8 /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 		C6B032CD642845CDF71426E4 /* DebugSnapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSnapshots.swift; sourceTree = "<group>"; };
 		C8CE99097E36215A297E2A71 /* RepriseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepriseTests.swift; sourceTree = "<group>"; };
 		CA49747C7F467D90DE80AC2A /* RecordingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStore.swift; sourceTree = "<group>"; };
@@ -62,6 +64,17 @@
 		E82CE4AFB2ECB01BB6C1618C /* Reprise.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Reprise.entitlements; sourceTree = "<group>"; };
 		EC49C9C574B9EDCD3B3B6CA0 /* Transcriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transcriber.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		41A1B4FCB593AE90AF3843E8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				781B3558C56B51B3FC2C62BA /* AVKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		26C88428D3D8B71B6E361877 /* RepriseTests */ = {
@@ -130,6 +143,14 @@
 			path = Transcription;
 			sourceTree = "<group>";
 		};
+		B966094ADF67E238A3642203 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C11AE3AAEAC84F35BDD60BA8 /* AVKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		CEA5F819DB282B0188078055 /* Library */ = {
 			isa = PBXGroup;
 			children = (
@@ -169,6 +190,7 @@
 				9AA2CD42D755D14573B6A977 /* Config */,
 				E06FECCD4F5D06EDFAA2125B /* Reprise */,
 				26C88428D3D8B71B6E361877 /* RepriseTests */,
+				B966094ADF67E238A3642203 /* Frameworks */,
 				3475AEC63AD9A70C9E8DEF33 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -200,6 +222,7 @@
 			buildPhases = (
 				55C7677F181D77ED55A50549 /* Sources */,
 				AF31DC873B78DCA31EAC39A6 /* Resources */,
+				41A1B4FCB593AE90AF3843E8 /* Frameworks */,
 			);
 			buildRules = (
 			);

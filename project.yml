@@ -26,6 +26,10 @@ targets:
     platform: macOS
     sources:
       - path: Reprise
+    dependencies:
+      # VideoPlayer lives in _AVKit_SwiftUI, which doesn't load AVKit itself;
+      # without an explicit link the player view's superclass is missing at runtime.
+      - sdk: AVKit.framework
     info:
       path: Reprise/Resources/Info.plist
       properties:
