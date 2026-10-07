@@ -155,14 +155,17 @@ struct PermissionRow: View {
             } else if let allow {
                 Button("Allow") { Task { await allow() } }
             } else {
-                Button("Open Settings") {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
-                }
+                Button("Open Settings") { Self.open(pane) }
             }
         } label: {
             Text(title)
             Text(detail)
         }
+    }
+
+    /// Opens the pane of Privacy & Security in System Settings.
+    static func open(_ pane: String) {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
     }
 }
 

@@ -5,7 +5,7 @@ import SwiftUI
 struct WelcomeView: View {
     @AppStorage("onboarded") private var onboarded = false
     @Environment(\.dismissWindow) private var dismissWindow
-    @State private var audioGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    @State private var audio = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screenGranted = ScreenRecorder.hasPermission
     @AppStorage("screenAccessRequested") private var screenRequested = false
     @State private var launchAtLogin = true
@@ -32,7 +32,8 @@ struct WelcomeView: View {
 
             VStack(spacing: 4) {
                 Step(icon: "mic.fill", tint: .red, title: "Microphone and system audio",
-                     detail: "So both sides of the call end up in the recording.", done: audioGranted) {
+                     detail: "So both sides of the call end up in the recording.", done: audio == .authorized,
+                     actionTitle: audio == .notDetermined ? "Allow" : "Open Settings") {
                     await requestAudio()
                 }
                 // macOS applies this permission only after a relaunch.
@@ -69,11 +70,14 @@ struct WelcomeView: View {
         .onAppear { withAnimation(.spring(duration: 0.8).delay(0.15)) { appeared = true } }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             screenGranted = ScreenRecorder.hasPermission
+            audio = AVCaptureDevice.authorizationStatus(for: .audio) // switched on in System Settings
         }
     }
 
     private func requestAudio() async {
-        guard await AVCaptureDevice.requestAccess(for: .audio) else { return }
+        // Once answered, macOS doesn't ask again: only System Settings changes it.
+        guard audio == .notDetermined else { return PermissionRow.open("Privacy_Microphone") }
+        guard await AVCaptureDevice.requestAccess(for: .audio) else { audio = .denied; return }
         // A blink of a recording makes macOS ask for system-audio access now rather than mid-call.
         let url = FileManager.default.temporaryDirectory.appending(path: "reprise-probe.m4a")
         let probe = AudioRecorder(url: url)
@@ -83,7 +87,7 @@ struct WelcomeView: View {
             probe.stop()
             try? FileManager.default.removeItem(at: url)
         }.value
-        withAnimation(.spring) { audioGranted = true }
+        withAnimation(.spring) { audio = .authorized }
     }
 
     private func finish() {
