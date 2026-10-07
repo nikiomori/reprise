@@ -20,7 +20,6 @@ struct Recording: Codable, Identifiable, Hashable {
     var audioURL: URL { FileManager.default.fileExists(atPath: partialAudioURL.path) ? partialAudioURL : finalAudioURL }
     var videoURL: URL { folder.appending(path: "screen.mov") }
     var transcriptURL: URL { folder.appending(path: "transcript.txt") }
-    var transcript: String? { try? String(contentsOf: transcriptURL, encoding: .utf8) }
 }
 
 @Observable final class RecordingStore {
@@ -29,10 +28,13 @@ struct Recording: Codable, Identifiable, Hashable {
         ?? URL.moviesDirectory.appending(path: "Reprise", directoryHint: .isDirectory)
 
     private(set) var recordings: [Recording] = []
+    /// Read once, not on every keystroke of a search. `nil` inside: there's no transcript.
+    @ObservationIgnored private var transcripts: [Recording.ID: String?] = [:]
 
     init() { reload() }
 
     func reload() {
+        transcripts.removeAll()
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let folders = (try? FileManager.default.contentsOfDirectory(at: Self.root, includingPropertiesForKeys: nil)) ?? []
@@ -56,7 +58,15 @@ struct Recording: Codable, Identifiable, Hashable {
         return recording
     }
 
+    func transcript(of recording: Recording) -> String? {
+        if let cached = transcripts[recording.id] { return cached }
+        let text = try? String(contentsOf: recording.transcriptURL, encoding: .utf8)
+        transcripts[recording.id] = text
+        return text
+    }
+
     func save(_ recording: Recording) {
+        transcripts.removeValue(forKey: recording.id) // saved after a transcript is written
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

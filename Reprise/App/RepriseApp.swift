@@ -20,6 +20,7 @@ struct RepriseApp: App {
         }
         .defaultSize(width: 980, height: 640)
         .windowToolbarStyle(.unified)
+        .commands { RecordingCommands(model: .shared) }
 
         Window("Welcome to Reprise", id: "welcome") {
             WelcomeView()
@@ -32,6 +33,22 @@ struct RepriseApp: App {
         Settings {
             SettingsView()
                 .showsInDock()
+        }
+    }
+}
+
+/// File menu: what a Mac app's menu bar is expected to offer while its window is open.
+private struct RecordingCommands: Commands {
+    let model: AppModel
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("New Recording") { Task { await model.record() } }
+                .keyboardShortcut("n")
+                .disabled(model.session != nil)
+            Button("Stop Recording") { Task { await model.stopRecording() } }
+                .keyboardShortcut(".")
+                .disabled(model.session == nil)
         }
     }
 }

@@ -36,6 +36,7 @@ nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @un
         config.capturesAudio = true
         config.excludesCurrentProcessAudio = true
         config.captureMicrophone = true
+        config.microphoneCaptureDeviceID = AudioObjectID.recordingMicrophone.string(kAudioDevicePropertyDeviceUID)
 
         let output = SCRecordingOutputConfiguration()
         output.outputURL = url

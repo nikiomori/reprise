@@ -41,9 +41,17 @@ final class IslandPanel: NSPanel {
 
     override var canBecomeKey: Bool { false }
 
-    /// Let clicks fall through while there's nothing to show.
+    /// Off screen while there's nothing to show: no clicks to catch, nothing for the window server to composite.
     private func followIsland() {
-        ignoresMouseEvents = AppModel.shared.island == .hidden
+        let hidden = AppModel.shared.island == .hidden
+        ignoresMouseEvents = hidden
+        if hidden {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in // after the exit animation
+                if AppModel.shared.island == .hidden { self?.orderOut(nil) }
+            }
+        } else {
+            orderFrontRegardless()
+        }
         withObservationTracking { _ = AppModel.shared.island } onChange: { [weak self] in
             Task { @MainActor in self?.followIsland() }
         }
@@ -66,6 +74,7 @@ extension Notification.Name {
 
 struct IslandView: View {
     let model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // One capsule whose size springs between states while its content cross-blurs.
@@ -94,12 +103,12 @@ struct IslandView: View {
                 .background(.black.opacity(0.38), in: .capsule)
                 .glassEffect(.regular, in: .capsule)
                 .gesture(WindowDragGesture())
-                .transition(.island)
+                .transition(reduceMotion ? .opacity : .island)
             }
         }
         .padding(.top, 8)
         .frame(width: IslandPanel.size.width, height: IslandPanel.size.height, alignment: .top)
-        .animation(.spring(duration: 0.5, bounce: 0.28), value: model.island)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.5, bounce: 0.28), value: model.island)
         .environment(\.colorScheme, .dark)
         .environment(\.controlActiveState, .key) // the panel never becomes key; don't draw it dimmed
     }
@@ -228,6 +237,7 @@ private struct RecordingContent: View {
                 Image(systemName: "rectangle.inset.filled").font(.caption).foregroundStyle(.secondary)
             }
             ElapsedTime(since: model.session?.recording.startedAt ?? .now)
+                .font(.system(.body, design: .rounded).weight(.semibold))
             if expanded {
                 LevelMeter(level: model.level)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
@@ -308,7 +318,6 @@ struct ElapsedTime: View {
     var body: some View {
         TimelineView(.periodic(from: since, by: 1)) { context in
             Text(context.date.timeIntervalSince(since).clock)
-                .font(.system(.body, design: .rounded).weight(.semibold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .animation(.snappy, value: Int(context.date.timeIntervalSince(since)))
@@ -316,24 +325,22 @@ struct ElapsedTime: View {
     }
 }
 
-/// Five bars that dance with the call's loudness.
+/// Five bars: the call's loudness over the last third of a second, newest on the right.
 struct LevelMeter: View {
     let level: () -> Float
-    @State private var smoothed: Double = 0
+    @State private var history = [Double](repeating: 0, count: 5)
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1 / 15)) { context in
             HStack(spacing: 2.5) {
-                ForEach(0..<5, id: \.self) { i in
-                    let wobble = 0.55 + 0.45 * sin(t * (5 + Double(i) * 1.7) + Double(i))
+                ForEach(history.indices, id: \.self) { i in
                     Capsule()
                         .fill(.white.opacity(0.9))
-                        .frame(width: 3, height: 4 + 16 * smoothed * wobble)
+                        .frame(width: 3, height: 4 + 16 * history[i])
                 }
             }
             .frame(height: 20)
-            .onChange(of: context.date) { smoothed = Self.follow(smoothed, level()) }
+            .onChange(of: context.date) { history = Array(history.dropFirst()) + [Self.normalize(level())] }
         }
     }
 
@@ -358,7 +365,7 @@ struct VoiceDots: View {
     @State private var them = 0.0
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 15)) { context in
             VStack(spacing: 4) {
                 dot(.white, you)
                 dot(.red, them)

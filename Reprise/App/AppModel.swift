@@ -165,8 +165,11 @@ enum IslandState: Equatable {
     private func discardPreroll() {
         guard let preroll else { return }
         self.preroll = nil
-        preroll.audio.stop()
-        try? FileManager.default.removeItem(at: preroll.recording.folder)
+        let (audio, folder) = (preroll.audio, preroll.recording.folder)
+        Task.detached { // see finish(_:)
+            audio.stop()
+            try? FileManager.default.removeItem(at: folder)
+        }
         log.notice("Discarded the early capture of an unanswered prompt")
     }
 
@@ -186,7 +189,10 @@ enum IslandState: Equatable {
     }
 
     private func finish(_ session: Session) async {
-        session.audio.stop()
+        let audio = session.audio
+        // Off the main thread: when Reprise is the last one on a Bluetooth mic, stopping waits for
+        // the headphones to leave their call mode, which can take seconds.
+        await Task.detached { audio.stop() }.value
         await session.screen?.stop()
         var recording = session.recording
         recording.duration = Date.now.timeIntervalSince(recording.startedAt)
@@ -198,8 +204,13 @@ enum IslandState: Equatable {
         }
     }
 
+    /// Records the call Reprise is asking about, if any; otherwise a recording without a call.
+    func record() async {
+        if case .prompt(let app) = island { await startRecording(app: app) } else { await startRecording(app: nil) }
+    }
+
     func toggleRecording() {
-        Task { session == nil ? await startRecording(app: nil) : await stopRecording() }
+        Task { session == nil ? await record() : await stopRecording() }
     }
 
     func dismissPrompt() { show(.hidden) }

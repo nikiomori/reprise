@@ -110,6 +110,24 @@ If you end the call, Reprise stops the recording automatically.
 1. Click the Reprise icon in the menu bar.
 2. Select **Start Recording**.
 
+When the library window is open, you can also select **File > New Recording** (⌘N). To stop, select **File > Stop Recording** (⌘.).
+
+### Use Spotlight, Shortcuts, or Siri
+
+Reprise adds two actions to macOS: **Start Recording** and **Stop Recording**.
+
+- In Spotlight, type "Start Recording".
+- In the Shortcuts app, use the actions in your shortcuts.
+- Say "Start recording with Reprise" to Siri.
+
+To start a recording with a keyboard shortcut:
+
+1. Open the Shortcuts app.
+2. Make a shortcut with the **Start Recording** action.
+3. Open the shortcut details and select **Add Keyboard Shortcut**.
+
+If Reprise asks to record a call, **Start Recording** records this call.
+
 ### Set a rule for a call app
 
 1. Open **Settings > Apps**.
@@ -129,7 +147,7 @@ Reprise also finds other apps that use the microphone for more than 10 seconds. 
 ### Find a recording
 
 1. Click the Reprise icon in the menu bar.
-2. Select **Library**.
+2. Select **Open Library**.
 
 The library shows the recordings by day. Use the search field to find a word in a title or in a transcript.
 
@@ -203,8 +221,9 @@ To run the tests, use `xcodebuild -scheme Reprise test`.
 
 ## How Reprise works
 
-- **Call detection.** Reprise reads the process list of Core Audio once each second. It finds the apps that use the microphone (`kAudioProcessPropertyIsRunningInput`).
+- **Call detection.** Core Audio tells Reprise when an app starts or stops audio. Then Reprise finds the apps that use the microphone (`kAudioProcessPropertyIsRunningInput`). When no call occurs, Reprise does no work.
 - **Audio.** A private aggregate device connects the microphone and a Core Audio process tap. The tap captures the audio of all apps except Reprise. The two sources use one clock, so they stay in sync.
+- **Headphones.** When an app opens the microphone of Bluetooth headphones, macOS changes the headphones to their call mode: the sound becomes mono, and the volume changes. Reprise does not cause this change. If no app uses the headphone microphone, Reprise records the built-in microphone of the Mac. When the call app stops all audio, Reprise stops the recording immediately. Thus the headphones go back to their usual mode at the end of the call.
 - **Screen.** ScreenCaptureKit writes the screen and the sound to a movie file (`SCRecordingOutput`).
 - **Interface.** Reprise uses SwiftUI and Liquid Glass. It has no third-party dependencies.
 

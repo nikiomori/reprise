@@ -9,6 +9,20 @@ nonisolated extension AudioObjectID {
         system.get(kAudioHardwarePropertyDefaultInputDevice, unknown)
     }
 
+    /// The mic to record: the default one, unless it's a Bluetooth headset no app is using.
+    /// Opening that switches the headphones to their call mode — mono, lower quality, its own
+    /// volume — so Reprise takes the built-in mic instead. In a call through the headset, the
+    /// call app already has it open, and Reprise records it.
+    static var recordingMicrophone: AudioObjectID {
+        let mic = defaultInputDevice
+        let bluetooth = [kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE].contains(mic.get(kAudioDevicePropertyTransportType, UInt32(0)))
+        guard bluetooth, mic.get(kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) == 0 else { return mic }
+        return system.ids(kAudioHardwarePropertyDevices).first {
+            $0.get(kAudioDevicePropertyTransportType, UInt32(0)) == kAudioDeviceTransportTypeBuiltIn
+                && $0.channelCount(scope: kAudioObjectPropertyScopeInput) > 0
+        } ?? mic
+    }
+
     static var defaultOutputDevice: AudioObjectID {
         system.get(kAudioHardwarePropertyDefaultOutputDevice, unknown)
     }

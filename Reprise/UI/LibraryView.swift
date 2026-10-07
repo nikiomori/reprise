@@ -15,6 +15,7 @@ struct LibraryView: View {
                             RecordingRow(recording: recording, isLive: model.session?.recording.id == recording.id)
                                 .tag(recording.id)
                                 .contextMenu {
+                                    ShareLink("Share…", item: recording.hasVideo ? recording.videoURL : recording.audioURL)
                                     Button("Show in Finder") { model.store.revealInFinder(recording) }
                                     Divider()
                                     Button("Move to Trash", role: .destructive) { model.delete(recording) }
@@ -51,6 +52,7 @@ struct LibraryView: View {
             }
         }
         .animation(.smooth(duration: 0.25), value: model.selection)
+        .navigationSubtitle(Text("^[\(model.store.recordings.count) call](inflect: true)"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: model.toggleRecording) {
@@ -74,7 +76,7 @@ struct LibraryView: View {
     private var sections: [(title: String, recordings: [Recording])] {
         let calendar = Calendar.current
         let matches = model.store.recordings.filter {
-            search.isEmpty || $0.title.localizedStandardContains(search) || ($0.transcript?.localizedStandardContains(search) ?? false)
+            search.isEmpty || $0.title.localizedStandardContains(search) || (model.store.transcript(of: $0)?.localizedStandardContains(search) ?? false)
         }
         let grouped = Dictionary(grouping: matches) { calendar.startOfDay(for: $0.startedAt) }
         return grouped.keys.sorted(by: >).map { day in
@@ -123,7 +125,6 @@ private struct RecordingDetail: View {
     let model: AppModel
     @State private var player: Player
     @State private var title: String
-    @State private var confirmDelete = false
     @State private var renaming = false
     @FocusState private var titleFocused: Bool
 
@@ -156,14 +157,10 @@ private struct RecordingDetail: View {
             ToolbarItemGroup {
                 ShareLink(item: recording.hasVideo ? recording.videoURL : recording.audioURL)
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
-                Button("Move to Trash", systemImage: "trash") { confirmDelete = true }
+                // No confirmation, like Finder: the Trash is the undo.
+                Button("Move to Trash", systemImage: "trash") { model.delete(recording) }
                     .disabled(model.isLive(recording))
             }
-        }
-        .confirmationDialog("Move “\(recording.title)” to the Trash?", isPresented: $confirmDelete) {
-            Button("Move to Trash", role: .destructive) { model.delete(recording) }
-        } message: {
-            Text("You can still restore it from the Trash in Finder.")
         }
         .onDisappear { player.avPlayer.pause() }
     }
@@ -294,16 +291,15 @@ private struct WaveformScrubber: View {
     var body: some View {
         GeometryReader { geometry in
             let progress = player.duration > 0 ? player.time / player.duration : 0
-            HStack(alignment: .center, spacing: 2) {
-                ForEach(0..<bars, id: \.self) { i in
-                    let peak = peaks.isEmpty ? 0 : CGFloat(peaks[i])
-                    Capsule()
-                        .fill(Double(i) / Double(bars) < progress ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
-                        .frame(height: max(3, geometry.size.height * peak))
-                        .animation(.spring(duration: 0.6, bounce: 0.3).delay(Double(i) * 0.004), value: peaks.isEmpty)
+            let wave = WaveformShape(peaks: peaks.isEmpty ? Array(repeating: 0, count: bars) : peaks, grown: peaks.isEmpty ? 0 : 1)
+            // The playhead only moves a mask; the bars themselves are drawn once.
+            ZStack {
+                wave.fill(.tertiary)
+                wave.fill(.tint).mask(alignment: .leading) {
+                    Rectangle().frame(width: geometry.size.width * progress)
                 }
             }
-            .frame(maxHeight: .infinity)
+            .animation(.easeOut(duration: 0.8), value: peaks.isEmpty)
             .overlay(alignment: .leading) {
                 if let hover {
                     Rectangle().fill(.primary.opacity(0.35)).frame(width: 1).offset(x: hover)
@@ -318,6 +314,34 @@ private struct WaveformScrubber: View {
             })
         }
         .task { peaks = await Waveform.peaks(of: source, count: bars) }
+    }
+}
+
+/// All the bars as one shape: one path, one layer, however fast the playhead moves.
+nonisolated private struct WaveformShape: Shape {
+    let peaks: [Float]
+    /// 0 → 1 as the bars rise, each a little after the one to its left.
+    var grown: Double
+
+    var animatableData: Double {
+        get { grown }
+        set { grown = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let gap: CGFloat = 2
+        let count = CGFloat(max(1, peaks.count))
+        let width = (rect.width - gap * (count - 1)) / count
+        var path = Path()
+        for (i, peak) in peaks.enumerated() {
+            let rise = min(1, max(0, grown * 1.5 - Double(i) / count * 0.5))
+            let height = max(3, rect.height * CGFloat(peak) * rise)
+            path.addRoundedRect(
+                in: CGRect(x: CGFloat(i) * (width + gap), y: rect.midY - height / 2, width: width, height: height),
+                cornerSize: CGSize(width: width / 2, height: width / 2)
+            )
+        }
+        return path
     }
 }
 
@@ -353,7 +377,7 @@ private struct TranscriptSection: View {
             HStack {
                 Text("Transcript").font(.title3.bold())
                 Spacer()
-                if let text = recording.transcript {
+                if let text = model.store.transcript(of: recording) {
                     Button("Copy", systemImage: "doc.on.doc") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(text, forType: .string)
@@ -368,7 +392,7 @@ private struct TranscriptSection: View {
                         Text("Transcribing…").shimmering()
                         ProgressView(value: progress).progressViewStyle(.linear)
                     }
-                } else if let text = recording.transcript {
+                } else if let text = model.store.transcript(of: recording) {
                     Text(text)
                         .textSelection(.enabled)
                         .lineSpacing(5)

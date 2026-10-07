@@ -1,57 +1,53 @@
 import SwiftUI
 
+/// Laid out like the system's own menu bar modules (Wi‑Fi, Focus): round chips that fill
+/// with color when on, section headers, full-width rows.
 struct MenuBarView: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Reprise").font(.headline)
-                Spacer()
-                Status(model: model)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Reprise")
+                .font(.headline)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 6)
 
-            RecordButton(model: model)
-
+            RecordRow(model: model)
+            Toggle("Record the Screen", isOn: $model.recordScreen)
+                .toggleStyle(ChipToggleStyle(icon: "rectangle.inset.filled.badge.record"))
             if model.session != nil, model.pillHidden {
-                Button("Show the Floating Pill", systemImage: "capsule.on.rectangle", action: model.showPill)
-                    .buttonStyle(.rowHighlight)
-            }
-
-            Toggle(isOn: $model.recordScreen) {
-                Text("Also record the screen").frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-
-            let recent = model.store.recordings.prefix(3)
-            if !recent.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Recent").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                        .padding(.bottom, 4)
-                    ForEach(recent) { recording in
-                        Button {
-                            open(recording)
-                        } label: {
-                            RecentRow(recording: recording)
-                        }
-                        .buttonStyle(.rowHighlight)
+                Button(action: model.showPill) {
+                    HStack(spacing: 10) {
+                        Chip(icon: "capsule")
+                        Text("Show the Floating Pill")
                     }
                 }
             }
 
-            Divider()
-
-            HStack(spacing: 4) {
-                Button("Library") { open(nil) }
-                SettingsLink { Text("Settings…") }
-                Spacer()
-                Button("Quit") { NSApp.terminate(nil) }
+            let recent = model.store.recordings.prefix(3)
+            if !recent.isEmpty {
+                MenuDivider()
+                Text("Recent")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 2)
+                ForEach(recent) { recording in
+                    Button { open(recording) } label: { RecentRow(recording: recording) }
+                }
             }
-            .buttonStyle(.rowHighlight)
+
+            MenuDivider()
+            Button("Open Library") { open(nil) }
+            SettingsLink { Text("Settings…") }
+                .keyboardShortcut(",")
+            Button("Quit Reprise") { NSApp.terminate(nil) }
+                .keyboardShortcut("q")
         }
-        .padding(14)
+        .buttonStyle(.rowHighlight)
+        .padding(5)
         .frame(width: 300)
     }
 
@@ -62,59 +58,66 @@ struct MenuBarView: View {
     }
 }
 
-private struct Status: View {
-    let model: AppModel
-
-    var body: some View {
-        Group {
-            if model.session != nil {
-                Label("Recording", systemImage: "circle.fill").foregroundStyle(.red)
-            } else if let app = model.detector.active.first {
-                Label("\(app.name) call", systemImage: "phone.fill").foregroundStyle(.green)
-            } else {
-                Label("Waiting for calls", systemImage: "ear").foregroundStyle(.secondary)
-            }
-        }
-        .font(.caption.weight(.medium))
-        .labelStyle(StatusLabelStyle())
-        .contentTransition(.opacity)
-        .animation(.smooth, value: model.session == nil)
-    }
-}
-
-private struct StatusLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 5) {
-            configuration.icon.font(.system(size: 7))
-            configuration.title
-        }
-    }
-}
-
-private struct RecordButton: View {
+private struct RecordRow: View {
     let model: AppModel
 
     var body: some View {
         Button(action: model.toggleRecording) {
             HStack(spacing: 10) {
+                Chip(icon: model.session == nil ? "record.circle" : "stop.fill", tint: model.session == nil ? nil : .red)
+                    .contentTransition(.symbolEffect(.replace))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(model.session == nil ? "Start Recording" : "Stop Recording")
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
                 if let session = model.session {
-                    Image(systemName: "stop.fill")
-                    Text("Stop")
-                    Spacer()
-                    LevelMeter(level: model.level)
-                    ElapsedTime(since: session.recording.startedAt)
-                } else {
-                    Image(systemName: "record.circle.fill")
-                    Text("Start Recording")
-                    Spacer()
+                    ElapsedTime(since: session.recording.startedAt).foregroundStyle(.secondary)
                 }
             }
-            .fontWeight(.semibold)
-            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(CapsuleButtonStyle(color: model.session == nil ? .red : Color(white: 0.35),
-                                        padding: EdgeInsets(top: 11, leading: 16, bottom: 11, trailing: 16)))
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: model.session == nil)
+        .animation(.smooth, value: model.session == nil)
+    }
+
+    private var status: String {
+        if let session = model.session { return session.recording.app.map { "\($0.name) call" } ?? "Without a call" }
+        if let app = model.detector.active.first { return "Call in \(app.name)" }
+        return "Waiting for calls"
+    }
+}
+
+/// The round icon of Control Center rows: gray when off, filled with color when on.
+private struct Chip: View {
+    let icon: String
+    var tint: Color?
+
+    var body: some View {
+        Image(systemName: icon)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(tint == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.white))
+            .frame(width: 26, height: 26)
+            .background(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.quaternary), in: .circle)
+    }
+}
+
+private struct ChipToggleStyle: ToggleStyle {
+    let icon: String
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            HStack(spacing: 10) {
+                Chip(icon: icon, tint: configuration.isOn ? .accentColor : nil)
+                configuration.label
+            }
+        }
+        .accessibilityValue(configuration.isOn ? "On" : "Off")
+        .animation(.smooth(duration: 0.2), value: configuration.isOn)
+    }
+}
+
+private struct MenuDivider: View {
+    var body: some View {
+        Divider().padding(.horizontal, 10).padding(.vertical, 5)
     }
 }
 
@@ -143,7 +146,8 @@ struct RowHighlightButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .contentShape(.rect)
             .background(.quaternary.opacity(hovering ? 1 : 0), in: .rect(cornerRadius: 8))

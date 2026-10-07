@@ -32,7 +32,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     func readVoices() -> (you: Float, them: Float) { voices.withLock { peaks in defer { peaks = (0, 0) }; return peaks } }
 
     func start() throws {
-        let mic = AudioObjectID.defaultInputDevice
+        let mic = AudioObjectID.recordingMicrophone
         let main = mic != .unknown ? mic : AudioObjectID.defaultOutputDevice
         guard let mainUID = main.string(kAudioDevicePropertyDeviceUID) else {
             throw CoreAudioError(action: "find an audio device", status: kAudioHardwareBadDeviceError)

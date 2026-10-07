@@ -23,7 +23,7 @@ struct WelcomeView: View {
                     .resizable()
                     .frame(width: 72, height: 72)
                     .padding(.bottom, 4)
-                Text("Reprise").font(.system(size: 34, weight: .bold, design: .rounded))
+                Text("Reprise").font(.system(size: 30, weight: .bold))
                 Text("Be present. Reprise remembers.").font(.title3).foregroundStyle(.secondary)
             }
             .padding(.top, 4)
@@ -46,29 +46,24 @@ struct WelcomeView: View {
                         CGRequestScreenCaptureAccess()
                     }
                 }
-                HStack(spacing: 14) {
-                    StepIcon(icon: "power", tint: .green)
-                    Toggle("Open Reprise at login", isOn: $launchAtLogin).toggleStyle(.switch)
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
             }
             .padding(.horizontal, 24)
             .padding(.top, 20)
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 16)
 
-            Button {
-                finish()
-            } label: {
-                Text("Get Started").fontWeight(.semibold).frame(maxWidth: .infinity)
+            VStack(spacing: 14) {
+                Button("Continue", action: finish)
+                    .buttonStyle(.glassProminent)
+                    .tint(.red) // Reprise's one accent, the way Voice Memos keeps its own
+                    .controlSize(.extraLarge)
+                    .keyboardShortcut(.defaultAction)
+                Toggle("Open Reprise at login", isOn: $launchAtLogin)
+                    .toggleStyle(.checkbox)
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.glassProminent)
-            .tint(.red)
-            .controlSize(.extraLarge)
-            .keyboardShortcut(.defaultAction)
-            .padding(24)
+            .padding(.top, 20)
+            .padding(.bottom, 24)
         }
         .frame(width: 520)
         .onAppear { withAnimation(.spring(duration: 0.8).delay(0.15)) { appeared = true } }
@@ -133,16 +128,16 @@ private struct Step: View {
     }
 }
 
+/// A tinted symbol, the way Apple's own Mac apps list what they need on first launch.
 private struct StepIcon: View {
     let icon: String
     let tint: Color
 
     var body: some View {
         Image(systemName: icon)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 32, height: 32)
-            .background(tint.gradient, in: .rect(cornerRadius: 9))
+            .font(.system(size: 22))
+            .foregroundStyle(tint)
+            .frame(width: 32)
     }
 }
 
@@ -195,7 +190,7 @@ private struct Demo: View {
                     .frame(height: 40)
                 case 1:
                     HStack(spacing: 8) {
-                        Circle().fill(.red).frame(width: 8, height: 8)
+                        VoiceDots { (.random(in: 0...0.3), .random(in: 0.1...0.6)) }
                         Text("0:12").font(.callout.weight(.semibold)).monospacedDigit()
                         LevelMeter { Float.random(in: 0.05...0.6) }.scaleEffect(0.8)
                     }
