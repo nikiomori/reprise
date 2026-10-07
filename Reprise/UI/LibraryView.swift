@@ -15,7 +15,7 @@ struct LibraryView: View {
                 ForEach(sections, id: \.title) { section in
                     Section(section.title) {
                         ForEach(section.recordings) { recording in
-                            RecordingRow(recording: recording, isLive: model.session?.recording.id == recording.id)
+                            RecordingRow(recording: recording, isLive: model.isLive(recording))
                                 .tag(recording.id)
                                 .contextMenu {
                                     ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
@@ -190,7 +190,7 @@ private struct RecordingDetail: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 if model.isLive(recording) {
-                    LiveCard(model: model, since: recording.startedAt)
+                    LiveCard(model: model, recording: recording)
                 } else {
                     if let player {
                         if recording.hasVideo {
@@ -263,24 +263,28 @@ private struct RecordingDetail: View {
     }
 }
 
-/// A call still being recorded has nothing to play yet.
+/// A call still being recorded, or saved after the stop, has nothing to play yet.
 private struct LiveCard: View {
     let model: AppModel
-    let since: Date
+    let recording: Recording
 
     var body: some View {
+        let saving = model.saving.contains(recording.id)
         HStack(spacing: 12) {
             Image(systemName: "record.circle.fill")
                 .font(.title2)
                 .foregroundStyle(.red)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Recording").font(.headline)
-                Text("You can play the call after it ends.").font(.callout).foregroundStyle(.secondary)
+                Text(saving ? "Saving…" : "Recording").font(.headline)
+                Text(saving ? "You can play the call in a moment." : "You can play the call after it ends.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
-            ElapsedTime(since: since).font(.title3.weight(.semibold))
-            Button("Stop", systemImage: "stop.fill") { Task { await model.stopRecording() } }
-                .buttonStyle(.glass)
+            if !saving {
+                ElapsedTime(since: recording.startedAt).font(.title3.weight(.semibold))
+                Button("Stop", systemImage: "stop.fill") { Task { await model.stopRecording() } }
+                    .buttonStyle(.glass)
+            }
         }
         .padding(20)
         .background(.background.secondary, in: .rect(cornerRadius: 22))

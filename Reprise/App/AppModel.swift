@@ -27,6 +27,8 @@ enum IslandState: Equatable {
         didSet { if let app = preroll?.recording.app, island != .prompt(app) { discardPreroll() } }
     }
     private(set) var session: Session?
+    /// Recordings stopped but not saved yet: their files are still being finished.
+    private(set) var saving: Set<Recording.ID> = []
     /// The call captured from its first second while the prompt asks whether to keep it.
     private(set) var preroll: Session?
     /// The floating pill is tucked away for the rest of this recording.
@@ -278,6 +280,7 @@ enum IslandState: Equatable {
     private func stop() {
         guard let session else { return }
         self.session = nil
+        saving.insert(session.recording.id)
         stopping = Task { await finish(session) }
     }
 
@@ -293,6 +296,7 @@ enum IslandState: Equatable {
         recording.duration = ended.timeIntervalSince(recording.startedAt)
         recording.movieStart = recording.movieStart ?? Self.movieStart(in: session)
         recording = await store.finalize(recording)
+        saving.remove(recording.id) // with the save, so the library opens it as done, with its player
         log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
         switch island {
         case .prompt: break // the next call's prompt still waits for an answer
@@ -375,7 +379,8 @@ enum IslandState: Equatable {
         if session?.recording.id == recording.id { session?.recording.title = title }
     }
 
-    func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id }
+    /// Being recorded or saved: its files aren't done yet.
+    func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id || saving.contains(recording.id) }
 
     func delete(_ recording: Recording, undo: UndoManager?) {
         guard !isLive(recording) else { return } // stop first; otherwise capture continues into the Trash
