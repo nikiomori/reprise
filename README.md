@@ -19,8 +19,9 @@ A *call app* is an app for audio or video calls, for example Google Meet, Zoom, 
 
 - Reprise finds calls automatically. When a call app starts to use the microphone, Reprise shows a *prompt* at the top of the screen.
 - You select **Record**. Or you set Reprise to record all calls from an app automatically.
+- Optional: Reprise records from the first second of the call, also if you select **Record** later.
 - Reprise records your microphone and the audio of the Mac into one file.
-- During the recording, a small *pill* shows a red dot and a timer. You can move the pill or hide it.
+- During the recording, a small *pill* shows two dots and a timer. The top dot lights when you speak. The red dot lights when the other persons speak. Thus you can see that Reprise records the two sides. You can move the pill or hide it.
 - Reprise stops the recording when the call ends.
 - The library shows all recordings. You can play, search, share, and delete them.
 - Reprise can send a recording to a transcription service. This step is optional.
@@ -42,7 +43,7 @@ The prompt, the pill during a recording, and the result:
 
 <p align="center">
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-prompt-dark.png"><img src="docs/media/island-prompt-light.png" width="400" alt="The prompt: Record this call?"></picture><br>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-recording-dark.png"><img src="docs/media/island-recording-light.png" width="400" alt="The pill: a red dot, a timer, a level meter, and a stop button"></picture><br>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-recording-dark.png"><img src="docs/media/island-recording-light.png" width="400" alt="The pill: two dots, a timer, a level meter, and a stop button"></picture><br>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-saved-dark.png"><img src="docs/media/island-saved-light.png" width="400" alt="The recording is saved"></picture>
 </p>
 
@@ -82,6 +83,20 @@ Reprise has a Developer ID signature, and Apple notarized it. Thus macOS opens i
 The recording starts. The pill shows at the top of the screen.
 
 > **NOTE:** If you do not select a button, the prompt closes after 20 seconds.
+
+### Record from the first second
+
+Sometimes you select **Record** after the call starts. To keep the call from the start:
+
+1. Open **Settings > General**.
+2. Select **Record calls from the first second**.
+
+Now, when the prompt shows, Reprise already records the audio. The prompt shows **Record from the start?**
+
+- If you select **Record**, the recording starts at the first second of the call.
+- If you do not select **Record**, Reprise deletes this audio permanently. The audio does not go to the Trash.
+
+Reprise records the screen only after you select **Record**.
 
 ### Stop a recording
 

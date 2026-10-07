@@ -136,7 +136,8 @@ private struct PromptContent: View {
             AppIcon(app: app, size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(app.name).font(.headline)
-                Text("Record this call?").font(.subheadline).foregroundStyle(.secondary)
+                Text(model.preroll == nil ? "Record this call?" : "Record from the start?")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             .fixedSize()
             Spacer(minLength: 16)
@@ -215,18 +216,14 @@ private struct ScreenToggle: View {
     }
 }
 
-/// Compact while you're on the call (dot + timer); hover to see the level and the stop button.
+/// Compact while you're on the call (two dots + timer); hover to see the level and the stop button.
 private struct RecordingContent: View {
     let model: AppModel
     @State private var expanded = false
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle()
-                .fill(.red)
-                .frame(width: 9, height: 9)
-                .shadow(color: .red, radius: 4)
-                .phaseAnimator([1.0, 0.35]) { dot, opacity in dot.opacity(opacity) } animation: { _ in .easeInOut(duration: 0.9) }
+            VoiceDots(levels: model.voices)
             if model.session?.screen != nil {
                 Image(systemName: "rectangle.inset.filled").font(.caption).foregroundStyle(.secondary)
             }
@@ -336,17 +333,53 @@ struct LevelMeter: View {
                 }
             }
             .frame(height: 20)
-            .onChange(of: context.date) {
-                let target = Self.normalize(level())
-                smoothed += (target - smoothed) * (target > smoothed ? 0.6 : 0.12)
-            }
+            .onChange(of: context.date) { smoothed = Self.follow(smoothed, level()) }
         }
+    }
+
+    /// Rises fast, falls slowly, like a VU meter.
+    static func follow(_ current: Double, _ peak: Float) -> Double {
+        let target = normalize(peak)
+        return current + (target - current) * (target > current ? 0.6 : 0.12)
     }
 
     /// dBFS → 0...1 over a -50…0 dB window, which is where speech lives.
     static func normalize(_ peak: Float) -> Double {
         guard peak > 0 else { return 0 }
         return min(1, max(0, (20 * log10(Double(peak)) + 50) / 50))
+    }
+}
+
+/// The logo's two dots, alive: the top one is you, the red one is everyone else.
+/// Each lights up when its side speaks, so a glance shows that both sides are recorded.
+struct VoiceDots: View {
+    let levels: () -> (you: Float, them: Float)
+    @State private var you = 0.0
+    @State private var them = 0.0
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+            VStack(spacing: 4) {
+                dot(.white, you)
+                dot(.red, them)
+            }
+            .onChange(of: context.date) {
+                let peaks = levels()
+                you = LevelMeter.follow(you, peaks.you)
+                them = LevelMeter.follow(them, peaks.them)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Recording you and the other people")
+    }
+
+    private func dot(_ color: Color, _ level: Double) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+            .opacity(0.4 + 0.6 * level)
+            .shadow(color: color.opacity(level), radius: 4 * level)
+            .scaleEffect(1 + 0.25 * level)
     }
 }
 

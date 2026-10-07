@@ -17,6 +17,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private var mix: AVAudioPCMBuffer?
     private var micChannels = 0
     private let peak = Mutex<Float>(0)
+    private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
 
     init(url: URL) { self.url = url }
@@ -26,6 +27,9 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
 
     /// Peak level (0...1) since the last read; read it from the UI at frame rate.
     func readLevel() -> Float { peak.withLock { level in defer { level = 0 }; return level } }
+
+    /// Peak of each side (0...1) since the last read: the mic, and everyone else.
+    func readVoices() -> (you: Float, them: Float) { voices.withLock { peaks in defer { peaks = (0, 0) }; return peaks } }
 
     func start() throws {
         let mic = AudioObjectID.defaultInputDevice
@@ -94,10 +98,11 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private func write(_ input: UnsafePointer<AudioBufferList>) {
         guard let file, let mix, let out = mix.floatChannelData?[0] else { return }
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
-        let frames = Self.mixDown(buffers, micChannels: micChannels, into: out, capacity: Int(mix.frameCapacity))
+        let (frames, you, them) = Self.mixDown(buffers, micChannels: micChannels, into: out, capacity: Int(mix.frameCapacity))
         guard frames > 0 else { return }
         let loudest = (0..<frames).reduce(Float(0)) { max($0, abs(out[$1])) }
         peak.withLock { $0 = max($0, loudest) }
+        voices.withLock { $0 = (max($0.you, you), max($0.them, them)) }
         if loudest > 0 { heard.withLock { $0 = true } }
         mix.frameLength = AVAudioFrameCount(frames)
         try? file.write(from: mix)
@@ -106,28 +111,36 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     /// Mixes one IO cycle of interleaved Float32 buffers down to mono: the average of the
     /// first `micChannels` channels (the mic — the aggregate lists sub-device streams before
     /// tap streams) plus the average of the rest (system audio), clipped to -1...1.
-    /// Returns the number of frames written to `out`.
-    static func mixDown(_ buffers: UnsafeMutableAudioBufferListPointer, micChannels: Int, into out: UnsafeMutablePointer<Float>, capacity: Int) -> Int {
-        guard let first = buffers.first, first.mNumberChannels > 0 else { return 0 }
+    /// Returns the number of frames written to `out` and the peak of each side before mixing.
+    static func mixDown(_ buffers: UnsafeMutableAudioBufferListPointer, micChannels: Int, into out: UnsafeMutablePointer<Float>, capacity: Int) -> (frames: Int, you: Float, them: Float) {
+        guard let first = buffers.first, first.mNumberChannels > 0 else { return (0, 0, 0) }
         let frames = Int(first.mDataByteSize) / (MemoryLayout<Float>.size * Int(first.mNumberChannels))
-        guard frames > 0, frames <= capacity else { return 0 }
+        guard frames > 0, frames <= capacity else { return (0, 0, 0) }
 
         let totalChannels = buffers.reduce(0) { $0 + Int($1.mNumberChannels) }
         let micWeight = micChannels > 0 ? 1 / Float(micChannels) : 0
         let systemWeight = totalChannels > micChannels ? 1 / Float(totalChannels - micChannels) : 0
 
         out.update(repeating: 0, count: frames)
+        var you: Float = 0, them: Float = 0
         var channel = 0
         for buffer in buffers {
             let count = Int(buffer.mNumberChannels)
             defer { channel += count }
             guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
             for c in 0..<count {
-                let weight = channel + c < micChannels ? micWeight : systemWeight
-                for f in 0..<frames { out[f] += data[f * count + c] * weight }
+                let isMic = channel + c < micChannels
+                let weight = isMic ? micWeight : systemWeight
+                var loudest: Float = 0
+                for f in 0..<frames {
+                    let sample = data[f * count + c]
+                    out[f] += sample * weight
+                    loudest = max(loudest, abs(sample))
+                }
+                if isMic { you = max(you, loudest) } else { them = max(them, loudest) }
             }
         }
         for f in 0..<frames { out[f] = min(1, max(-1, out[f])) }
-        return frames
+        return (frames, you, them)
     }
 }

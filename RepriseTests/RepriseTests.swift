@@ -25,7 +25,7 @@ import Testing
 
 struct MixDownTests {
     /// Mixes interleaved Float32 streams through `AudioRecorder.mixDown`.
-    private func mix(_ streams: [(channels: Int, samples: [Float])], micChannels: Int) -> [Float] {
+    private func mix(_ streams: [(channels: Int, samples: [Float])], micChannels: Int) -> (samples: [Float], you: Float, them: Float) {
         let list = AudioBufferList.allocate(maximumBuffers: streams.count)
         let samples = streams.map { stream in
             let pointer = UnsafeMutablePointer<Float>.allocate(capacity: stream.samples.count)
@@ -41,21 +41,27 @@ struct MixDownTests {
         for (i, stream) in streams.enumerated() {
             list[i] = AudioBuffer(mNumberChannels: UInt32(stream.channels), mDataByteSize: UInt32(stream.samples.count * 4), mData: samples[i])
         }
-        let frames = AudioRecorder.mixDown(list, micChannels: micChannels, into: out, capacity: 64)
-        return Array(UnsafeBufferPointer(start: out, count: frames))
+        let (frames, you, them) = AudioRecorder.mixDown(list, micChannels: micChannels, into: out, capacity: 64)
+        return (Array(UnsafeBufferPointer(start: out, count: frames)), you, them)
     }
 
     @Test func sumsMicAndSystem() {
-        #expect(mix([(1, [0.5, -0.5]), (1, [0.25, 0.25])], micChannels: 1) == [0.75, -0.25])
+        #expect(mix([(1, [0.5, -0.5]), (1, [0.25, 0.25])], micChannels: 1).samples == [0.75, -0.25])
+    }
+
+    @Test func measuresEachSideSeparately() {
+        let result = mix([(2, [0.2, -0.6, 0, 0]), (1, [0.1, 0.3])], micChannels: 2)
+        #expect(result.you == 0.6)
+        #expect(result.them == 0.3)
     }
 
     @Test func averagesChannelsWithinEachSource() {
         // Stereo interleaved mic (L, R, L, R) + mono system.
-        #expect(mix([(2, [0.2, 0.4, 0, 0]), (1, [0.1, 0.5])], micChannels: 2) == [0.3 + 0.1, 0.5])
+        #expect(mix([(2, [0.2, 0.4, 0, 0]), (1, [0.1, 0.5])], micChannels: 2).samples == [0.3 + 0.1, 0.5])
     }
 
     @Test func clipsInsteadOfWrapping() {
-        #expect(mix([(1, [0.9]), (1, [0.9])], micChannels: 1) == [1])
+        #expect(mix([(1, [0.9]), (1, [0.9])], micChannels: 1).samples == [1])
     }
 }
 

@@ -18,6 +18,7 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     @Bindable private var model = AppModel.shared
     @AppStorage("showRecordingPill") private var showPill = true
+    @AppStorage("recordFromStart") private var recordFromStart = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screen = ScreenRecorder.hasPermission
@@ -31,6 +32,10 @@ private struct GeneralSettings: View {
                     }
                 Toggle("Record the screen by default", isOn: $model.recordScreen)
                 Toggle("Show the floating pill while recording", isOn: $showPill)
+                Toggle(isOn: $recordFromStart) {
+                    Text("Record calls from the first second")
+                    Text("While Reprise asks, it already records. Select Record to keep the call from the start. If you don't, Reprise deletes that audio.")
+                }
             }
             Section("Recordings") {
                 LabeledContent("Saved in") {

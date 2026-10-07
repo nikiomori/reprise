@@ -19,8 +19,13 @@ enum IslandState: Equatable {
 
     let store = RecordingStore()
     let detector = MeetingDetector()
-    private(set) var island = IslandState.hidden
+    private(set) var island = IslandState.hidden {
+        // The prompt went away without a Record: nobody wanted that early audio.
+        didSet { if let app = preroll?.recording.app, island != .prompt(app) { discardPreroll() } }
+    }
     private(set) var session: Session?
+    /// The call captured from its first second while the prompt asks whether to keep it.
+    private(set) var preroll: Session?
     /// The floating pill is tucked away for the rest of this recording.
     private(set) var pillHidden = false
     private(set) var transcribing: [Recording.ID: Double] = [:]
@@ -41,6 +46,7 @@ enum IslandState: Equatable {
         detector.onStart = { [unowned self] app in callStarted(app) }
         detector.onEnd = { [unowned self] app in callEnded(app) }
         detector.start()
+        store.deleteUnanswered()
         // Finish recordings that were cut short last time (crash, force quit, power loss).
         Task {
             for recording in store.recordings where FileManager.default.fileExists(atPath: recording.partialAudioURL.path) {
@@ -56,7 +62,9 @@ enum IslandState: Equatable {
         guard session == nil else { return }
         switch app.rule {
         case .always: Task { await startRecording(app: app) }
-        case .ask: show(.prompt(app), for: .seconds(20))
+        case .ask:
+            show(.prompt(app), for: .seconds(20))
+            if UserDefaults.standard.bool(forKey: "recordFromStart") { startPreroll(app) }
         case .never: break
         }
     }
@@ -73,19 +81,27 @@ enum IslandState: Equatable {
     // MARK: Recording
 
     @ObservationIgnored private var starting = false
+    @ObservationIgnored private var prerolling: Task<Void, Never>?
 
     func startRecording(app: MeetingApp?) async {
+        await prerolling?.value // Record was pressed while the early capture was still starting
         guard session == nil, !starting else { return } // a double-click must not start two recorders
         starting = true
         defer { starting = false }
-        guard await AVCaptureDevice.requestAccess(for: .audio) else {
-            return show(.problem("Reprise needs microphone access"), for: .seconds(6))
-        }
         do {
-            var recording = try store.create(app: app, at: .now)
-            let audio = AudioRecorder(url: recording.partialAudioURL)
-            // Off the main thread: the first start blocks while macOS shows its permission prompt.
-            try await Task.detached { try audio.start() }.value
+            var recording: Recording
+            let audio: AudioRecorder
+            if let kept = takePreroll(for: app) {
+                (recording, audio) = (kept.recording, kept.audio)
+            } else {
+                guard await AVCaptureDevice.requestAccess(for: .audio) else {
+                    return show(.problem("Reprise needs microphone access"), for: .seconds(6))
+                }
+                recording = try store.create(app: app, at: .now)
+                audio = AudioRecorder(url: recording.partialAudioURL)
+                // Off the main thread: the first start blocks while macOS shows its permission prompt.
+                try await Task.detached { try audio.start() }.value
+            }
 
             var screen: ScreenRecorder?
             if recordScreen {
@@ -118,6 +134,40 @@ enum IslandState: Equatable {
             log.error("Recording failed to start: \(error.localizedDescription, privacy: .public)")
             show(.problem(error.localizedDescription), for: .seconds(6))
         }
+    }
+
+    /// Starts capturing as the prompt shows, so Record keeps the call from its first second.
+    private func startPreroll(_ app: MeetingApp) {
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        prerolling = Task {
+            guard let recording = try? store.create(app: app, at: .now) else { return }
+            let audio = AudioRecorder(url: recording.partialAudioURL)
+            guard (try? await Task.detached { try audio.start() }.value) != nil else {
+                try? FileManager.default.removeItem(at: recording.folder)
+                return
+            }
+            preroll = Session(recording: recording, audio: audio, screen: nil)
+            if island != .prompt(app) { discardPreroll() } // dismissed, or the call ended, while starting
+        }
+    }
+
+    /// The early capture of this call, if there is one. An early capture of any other call is dropped.
+    private func takePreroll(for app: MeetingApp?) -> Session? {
+        guard let preroll, app != nil, preroll.recording.app == app else {
+            discardPreroll()
+            return nil
+        }
+        self.preroll = nil
+        return preroll
+    }
+
+    /// Deletes it for good, not to the Trash: it was never a recording anyone asked for.
+    private func discardPreroll() {
+        guard let preroll else { return }
+        self.preroll = nil
+        preroll.audio.stop()
+        try? FileManager.default.removeItem(at: preroll.recording.folder)
+        log.notice("Discarded the early capture of an unanswered prompt")
     }
 
     /// The stop in progress, so quitting can wait until the files are written.
@@ -174,6 +224,14 @@ enum IslandState: Equatable {
         if session == nil, DebugSnapshots.isRunning { return .random(in: 0.02...0.45) }
         #endif
         return session?.audio.readLevel() ?? 0
+    }
+
+    /// Each side's level for the pill's two dots, 0...1.
+    func voices() -> (you: Float, them: Float) {
+        #if DEBUG
+        if session == nil, DebugSnapshots.isRunning { return (.random(in: 0...0.2), .random(in: 0.02...0.45)) }
+        #endif
+        return session?.audio.readVoices() ?? (0, 0)
     }
 
     // MARK: Island

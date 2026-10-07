@@ -68,6 +68,17 @@ struct Recording: Codable, Identifiable, Hashable {
         }
     }
 
+    /// Deletes the early capture of calls nobody chose to record (Reprise quit while it asked):
+    /// a folder with an audio stream but no `recording.json`.
+    func deleteUnanswered() {
+        let files = FileManager.default
+        for folder in (try? files.contentsOfDirectory(at: Self.root, includingPropertiesForKeys: nil)) ?? []
+        where !files.fileExists(atPath: folder.appending(path: "recording.json").path)
+            && files.fileExists(atPath: folder.appending(path: "audio.aac").path) {
+            try? files.removeItem(at: folder)
+        }
+    }
+
     /// Repackages the crash-safe ADTS stream into a regular `.m4a` (no re-encoding) and saves.
     @discardableResult
     func finalize(_ recording: Recording) async -> Recording {
