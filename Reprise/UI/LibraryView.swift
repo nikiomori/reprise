@@ -19,6 +19,7 @@ struct LibraryView: View {
                                 .tag(recording.id)
                                 .contextMenu {
                                     ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
+                                        .disabled(model.isLive(recording)) // its file is still being written
                                     Button("Show in Finder") { model.store.revealInFinder(recording) }
                                     Divider()
                                     Button("Move to Trash", role: .destructive) { model.delete(recording, undo: undoManager) }
@@ -212,6 +213,7 @@ private struct RecordingDetail: View {
             ToolbarSpacer(.fixed) // this call's actions apart from Record, which isn't about it
             ToolbarItemGroup {
                 ShareLink(item: CallFile(recording), preview: SharePreview(recording.title))
+                    .disabled(model.isLive(recording))
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
                 // No confirmation, like Finder: Edit > Undo puts it back.
                 Button("Move to Trash", systemImage: "trash") { model.delete(recording, undo: undoManager) }
