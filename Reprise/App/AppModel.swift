@@ -358,14 +358,21 @@ enum IslandState: Equatable {
 
     func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id }
 
-    func delete(_ recording: Recording) {
+    func delete(_ recording: Recording, undo: UndoManager?) {
         guard !isLive(recording) else { return } // stop first; otherwise capture continues into the Trash
         let index = store.recordings.firstIndex { $0.id == recording.id } ?? 0
-        store.delete(recording)
+        guard let trashed = store.delete(recording) else { return }
         // The next call takes its place, as in Mail and Voice Memos.
-        if selection == recording.id, !store.recordings.contains(where: { $0.id == recording.id }) {
+        if selection == recording.id {
             selection = (store.recordings.dropFirst(index).first ?? store.recordings.last)?.id
         }
+        // Edit > Undo puts it back, as in Finder and Mail.
+        undo?.registerUndo(withTarget: self) { model in
+            guard (try? FileManager.default.moveItem(at: trashed, to: recording.folder)) != nil else { return }
+            model.store.reload()
+            model.selection = recording.id
+        }
+        undo?.setActionName("Move to Trash")
     }
 
     func transcribe(_ recording: Recording) {

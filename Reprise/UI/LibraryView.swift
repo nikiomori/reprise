@@ -6,6 +6,7 @@ struct LibraryView: View {
     @State private var search = ""
     @FocusState private var listFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         let sections = self.sections
@@ -20,7 +21,7 @@ struct LibraryView: View {
                                     ShareLink("Share…", item: recording.hasVideo ? recording.videoURL : recording.audioURL)
                                     Button("Show in Finder") { model.store.revealInFinder(recording) }
                                     Divider()
-                                    Button("Move to Trash", role: .destructive) { model.delete(recording) }
+                                    Button("Move to Trash", role: .destructive) { model.delete(recording, undo: undoManager) }
                                         .disabled(model.isLive(recording))
                                 }
                         }
@@ -31,7 +32,7 @@ struct LibraryView: View {
             .defaultFocus($listFocused, true) // not the title field, which would select itself
             .searchable(text: $search, placement: .sidebar, prompt: "Search calls")
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
-            .onDeleteCommand { if let selected { model.delete(selected) } }
+            .onDeleteCommand { if let selected { model.delete(selected, undo: undoManager) } }
             .overlay {
                 if !model.store.recordings.isEmpty, sections.isEmpty {
                     ContentUnavailableView.search(text: search)
@@ -134,6 +135,7 @@ private struct RecordingDetail: View {
     @State private var title: String
     @State private var renaming = false
     @FocusState private var titleFocused: Bool
+    @Environment(\.undoManager) private var undoManager
 
     init(recording: Recording, model: AppModel) {
         self.recording = recording
@@ -170,8 +172,8 @@ private struct RecordingDetail: View {
             ToolbarItemGroup {
                 ShareLink(item: recording.hasVideo ? recording.videoURL : recording.audioURL)
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
-                // No confirmation, like Finder: the Trash is the undo.
-                Button("Move to Trash", systemImage: "trash") { model.delete(recording) }
+                // No confirmation, like Finder: Edit > Undo puts it back.
+                Button("Move to Trash", systemImage: "trash") { model.delete(recording, undo: undoManager) }
                     .disabled(model.isLive(recording))
             }
         }

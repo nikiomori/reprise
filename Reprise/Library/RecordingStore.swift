@@ -162,10 +162,12 @@ struct Recording: Codable, Identifiable, Equatable {
         _ = try FileManager.default.replaceItemAt(movie, withItemAt: temporary)
     }
 
-    /// Moves the recording to the Trash, so it can be recovered.
-    func delete(_ recording: Recording) {
-        guard (try? FileManager.default.trashItem(at: recording.folder, resultingItemURL: nil)) != nil else { return }
+    /// Moves the recording to the Trash, so it can be recovered. Returns where it is in the Trash.
+    func delete(_ recording: Recording) -> URL? {
+        var trashed: NSURL?
+        guard (try? FileManager.default.trashItem(at: recording.folder, resultingItemURL: &trashed)) != nil else { return nil }
         recordings.removeAll { $0.id == recording.id }
+        return trashed as URL?
     }
 
     func revealInFinder(_ recording: Recording? = nil) {
