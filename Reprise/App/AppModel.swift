@@ -304,11 +304,12 @@ enum IslandState: Equatable {
     private func finish(_ session: Session) async {
         let ended = Date.now // the stop may only finish after the Mac wakes from sleep
         let audio = session.audio
+        // The screen first: the movie lasts until it stops, and the audio's stop may take seconds.
+        await session.screen?.stop()
         // Off the main thread: when Reprise is the last one on a Bluetooth mic, stopping waits for
         // the headphones to leave their call mode, which can take seconds.
         await Task.detached { audio.stop() }.value
         if audio.hasHeardThem { UserDefaults.standard.set(true, forKey: "systemAudioHeard") } // Settings shows it as allowed
-        await session.screen?.stop()
         var recording = session.recording
         recording.duration = ended.timeIntervalSince(recording.startedAt)
         recording.movieStart = recording.movieStart ?? Self.movieStart(in: session)
