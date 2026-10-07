@@ -10,7 +10,9 @@ import VideoToolbox
 /// Its own writer, because `SCRecordingOutput` takes no bitrate: it wrote 9–47 Mbit/s where
 /// HEVC at quality 0.65 writes 0.5–6 and looks the same. The movie goes to disk in 5-second
 /// fragments, so a crash costs only its last seconds.
-nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
+nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    /// macOS stopped the capture before `stop()`: a display went away, or someone stopped it from the menu bar.
+    var onStop: @Sendable (Error) -> Void = { _ in }
     private var stream: SCStream?
     private var writer: AVAssetWriter?
     private var input: AVAssetWriterInput?
@@ -70,7 +72,7 @@ nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, @unchecked Sen
         guard writer.startWriting() else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
         (self.writer, self.input) = (writer, input)
 
-        let stream = SCStream(filter: filter, configuration: config, delegate: nil)
+        let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         try await stream.startCapture()
         self.stream = stream
@@ -97,5 +99,9 @@ nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, @unchecked Sen
             started.withLock { $0 = CMClockConvertHostTimeToSystemUnits(buffer.presentationTimeStamp) }
         }
         if input.isReadyForMoreMediaData { input.append(buffer) } // a busy encoder drops a frame, never stalls capture
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+        if self.stream != nil { onStop(error) } // not the stop Reprise asked for
     }
 }

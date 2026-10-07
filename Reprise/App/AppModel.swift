@@ -115,6 +115,13 @@ enum IslandState: Equatable {
             if recordScreen {
                 if ScreenRecorder.hasPermission {
                     let recorder = ScreenRecorder()
+                    recorder.onStop = { [weak self] error in // macOS ended it mid-call: the movie would freeze unnoticed
+                        let message = error.localizedDescription
+                        Task { @MainActor in
+                            log.error("The screen recording stopped: \(message, privacy: .public)")
+                            self?.show(.problem("Recording without the screen: \(message)"), for: .seconds(8))
+                        }
+                    }
                     do {
                         try await recorder.start(url: recording.videoURL, showing: app)
                         screen = recorder
