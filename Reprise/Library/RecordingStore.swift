@@ -6,7 +6,7 @@ import AppKit
 /// While recording, audio goes to `audio.aac` (ADTS), which stays playable even if the app is
 /// killed mid-call; it's repackaged into `audio.m4a` when the recording stops.
 struct Recording: Codable, Identifiable, Equatable {
-    let id: String // folder name, e.g. "2026-10-06 21.30.12 Zoom"
+    var id: String // folder name, e.g. "2026-10-06 21.30.12 Zoom"
     var title: String
     var app: MeetingApp?
     let startedAt: Date
@@ -41,7 +41,11 @@ struct Recording: Codable, Identifiable, Equatable {
         decoder.dateDecodingStrategy = .iso8601
         let folders = (try? FileManager.default.contentsOfDirectory(at: Self.root, includingPropertiesForKeys: nil)) ?? []
         recordings = folders
-            .compactMap { try? decoder.decode(Recording.self, from: Data(contentsOf: $0.appending(path: "recording.json"))) }
+            .compactMap { folder in
+                var recording = try? decoder.decode(Recording.self, from: Data(contentsOf: folder.appending(path: "recording.json")))
+                recording?.id = folder.lastPathComponent // a folder copied or renamed in Finder is that folder, not the one it came from
+                return recording
+            }
             .sorted { $0.startedAt > $1.startedAt }
     }
 

@@ -209,6 +209,18 @@ struct UpdaterTests {
         #expect(await store.finalize(recording).title == "Interview")
     }
 
+    /// A folder duplicated or renamed in Finder is a recording of its own, so it plays and trashes itself.
+    @Test func recordingIsItsFolder() throws {
+        let recording = try store.create(app: nil, at: .now)
+        store.save(recording)
+        let copy = RecordingStore.root.appending(path: "\(recording.id) copy", directoryHint: .isDirectory)
+        defer { [recording.folder, copy].forEach { try? FileManager.default.removeItem(at: $0) } }
+        try FileManager.default.copyItem(at: recording.folder, to: copy)
+        store.reload()
+        #expect(store.recordings.contains { $0.id == recording.id })
+        #expect(store.recordings.first { $0.id == "\(recording.id) copy" }?.folder == copy)
+    }
+
     /// Two seconds of sound in the crash-safe stream and a second of movie without sound, as a recording leaves them.
     private func screenRecording(movieStart: TimeInterval?) async throws -> Recording {
         var recording = try store.create(app: nil, at: .now)
