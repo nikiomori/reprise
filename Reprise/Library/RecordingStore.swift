@@ -22,6 +22,10 @@ struct Recording: Codable, Identifiable, Equatable {
     var audioURL: URL { FileManager.default.fileExists(atPath: partialAudioURL.path) ? partialAudioURL : finalAudioURL }
     var videoURL: URL { folder.appending(path: "screen.mov") }
     var transcriptURL: URL { folder.appending(path: "transcript.txt") }
+    // ponytail: a call trashed in Finder keeps its clones' space until macOS clears the temporary
+    // folder (3 days unused). Clear this folder for calls gone at reload if that's too late.
+    /// The clones Share and dragging out hand over under the title. Trashing the call removes them.
+    var copiesFolder: URL { FileManager.default.temporaryDirectory.appending(path: "reprise-calls/\(id)", directoryHint: .isDirectory) }
 }
 
 @Observable final class RecordingStore {
@@ -166,6 +170,7 @@ struct Recording: Codable, Identifiable, Equatable {
     func delete(_ recording: Recording) -> URL? {
         var trashed: NSURL?
         guard (try? FileManager.default.trashItem(at: recording.folder, resultingItemURL: &trashed)) != nil else { return nil }
+        try? FileManager.default.removeItem(at: recording.copiesFolder) // or they'd keep its space after the Trash is emptied
         recordings.removeAll { $0.id == recording.id }
         return trashed as URL?
     }

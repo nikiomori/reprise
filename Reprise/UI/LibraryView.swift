@@ -137,23 +137,30 @@ private struct RecordingRow: View {
 nonisolated struct CallFile: Transferable {
     let url: URL
     let title: String
+    let copies: URL
 
     @MainActor init(_ recording: Recording) {
         url = recording.hasVideo ? recording.videoURL : recording.audioURL
         title = recording.title
+        copies = recording.copiesFolder
     }
 
     static var transferRepresentation: some TransferRepresentation {
-        ProxyRepresentation { try $0.named() }
+        ProxyRepresentation { $0.named() }
     }
 
-    // ponytail: the copies stay in the temporary folder. Free while the call is kept; a trashed
-    // call's space comes back once macOS clears that folder. Delete them after the drop if that's too late.
-    /// A copy under the title, on the same disk so it's a clone: instant, and it takes no space.
-    func named() throws -> URL {
-        let folder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: url, create: true)
+    /// A clone under the title: instant, and it takes no space while the call is kept. Made on the
+    /// main thread at each right-click, drag and Share, so where the file can't be cloned (a library
+    /// on another disk) it goes under its own name rather than as a full copy each time. Each clone
+    /// gets a folder of its own: a drag asks for several at once, and the file may have changed since.
+    func named() -> URL {
+        let folder = copies.appending(path: UUID().uuidString)
         let copy = folder.appending(path: "\(title.replacingOccurrences(of: "/", with: "-")).\(url.pathExtension)") // a "/" would nest folders
-        try FileManager.default.copyItem(at: url, to: copy)
+        guard (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)) != nil,
+              clonefile(url.path, copy.path, 0) == 0 else {
+            try? FileManager.default.removeItem(at: folder)
+            return url
+        }
         return copy
     }
 }

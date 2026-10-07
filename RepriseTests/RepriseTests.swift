@@ -239,9 +239,10 @@ struct UpdaterTests {
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         recording.title = "Q3/Q4 review"
         try Data("sound".utf8).write(to: recording.finalAudioURL)
-        let copy = try CallFile(recording).named()
-        defer { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }
+        let copy = CallFile(recording).named()
+        defer { try? FileManager.default.removeItem(at: recording.copiesFolder) }
         #expect(copy.lastPathComponent == "Q3-Q4 review.m4a")
+        #expect(copy.path.hasPrefix(recording.copiesFolder.path)) // where trashing the call removes it
         #expect(FileManager.default.contentsEqual(atPath: copy.path, andPath: recording.finalAudioURL.path))
     }
 
