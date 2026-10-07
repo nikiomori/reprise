@@ -181,7 +181,8 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     /// `changed`: the object that sent a notification; none for the timer.
     private func tick(_ changed: AudioObjectID? = nil) {
         defer { schedule() }
-        let processes = watchNewObjects()
+        // The lists notify when they change; a call's timer ticks are only for the delays.
+        let processes = changed == nil && !firstSeen.isEmpty ? [] : watchNewObjects()
         if changed == nil, firstSeen.isEmpty {
             processes.forEach(recheck) // between calls, the timer goes over all, in case a notification got lost
         } else {
