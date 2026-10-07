@@ -146,7 +146,8 @@ enum IslandState: Equatable {
     // ponytail: notices a lost microphone within 10 s; listen to the device list if that's too late.
     /// Keeps the sound coming: a recording that stopped getting it, usually because the microphone
     /// went away (it also carries the clock for the Mac's sound), goes on with the one there is now.
-    /// Warns once when that doesn't help (a full disk) or no sound comes at all (a missing permission).
+    /// Warns once when that doesn't help (a full disk), no sound comes at all, or a call goes on
+    /// without the other side (both usually a missing permission).
     private func watch(_ id: Recording.ID, _ audio: AudioRecorder) async {
         var written = -1
         var warned = false
@@ -165,6 +166,8 @@ enum IslandState: Equatable {
             let problem = tick == 0 ? nil
                 : !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
                 : stalled && stalledBefore ? "The recording stopped getting sound. Check the microphone and the free disk space."
+                // Three minutes in: a waiting room is silent too.
+                : tick >= 36 && session.recording.app != nil && !audio.hasHeardThem ? "No sound from the other side yet. Check System Audio Recording in Privacy & Security."
                 : nil
             if let problem, !warned { show(.problem(problem), for: .seconds(8)) }
             warned = problem != nil
