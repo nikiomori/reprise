@@ -107,6 +107,11 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     private var lastSeen: [MeetingApp: Date] = [:]
     private var timer: Timer?
     private var watched: Set<AudioObjectID> = []
+    /// Processes with audio going on, kept by their `IsRunning` notifications. A tick asks Core
+    /// Audio about these few instead of every audio process: ~35 round trips took 10 ms.
+    private var running: Set<AudioObjectID> = []
+    /// The app of each running process: finding it takes round trips and LaunchServices.
+    private var apps: [AudioObjectID: MeetingApp?] = [:]
 
     // ponytail: two fixed values; per-app tuning if some app's calls end with a long tail.
     /// How long an app may keep playing sound with the mic closed before its call counts as over.
@@ -124,24 +129,31 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     private func listen(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) {
         var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         AudioObjectAddPropertyListenerBlock(object, &address, .main) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.tick() }
+            MainActor.assumeIsolated { self?.tick(object) }
         }
     }
 
     /// Microphone use itself (`IsRunningInput`) sends no notifications. What does: a process
     /// starting or stopping its audio, and an input device getting a new client — an app that
     /// already plays sound and now opens the mic.
-    private func watchNewObjects() {
+    private func watchNewObjects() -> [AudioObjectID] {
         let processes = AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList)
         let devices = AudioObjectID.system.ids(kAudioHardwarePropertyDevices)
         watched.formIntersection(processes + devices) // gone objects take their listeners with them
+        running.formIntersection(processes)
         for process in processes where watched.insert(process).inserted {
             listen(process, kAudioProcessPropertyIsRunning)
+            recheck(process) // it may be playing already
         }
         // Output devices go into `watched` too, so their channels are only counted once.
         for device in devices where watched.insert(device).inserted && device.channelCount(scope: kAudioObjectPropertyScopeInput) > 0 {
             listen(device, kAudioDevicePropertyDeviceIsRunningSomewhere)
         }
+        return processes
+    }
+
+    private func recheck(_ process: AudioObjectID) {
+        if process.get(kAudioProcessPropertyIsRunning, UInt32(0)) == 1 { running.insert(process) } else { running.remove(process) }
     }
 
     /// Every second while a call starts, runs or ends, for the delays below; the callbacks
@@ -159,10 +171,17 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         self.timer = timer
     }
 
-    private func tick() {
+    /// `changed`: the object that sent a notification; none for the timer.
+    private func tick(_ changed: AudioObjectID? = nil) {
         defer { schedule() }
-        watchNewObjects()
-        let (audible, microphone) = Self.audioApps()
+        let processes = watchNewObjects()
+        if changed == nil, firstSeen.isEmpty {
+            processes.forEach(recheck) // between calls, the timer goes over all, in case a notification got lost
+        } else {
+            running.forEach(recheck) // a process that stops notifies too, but nothing depends on it
+            if let changed, processes.contains(changed) { recheck(changed) }
+        }
+        let (audible, microphone) = audioApps()
         update(now: .now, microphone: microphone, audible: audible)
     }
 
@@ -192,29 +211,30 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         }
     }
 
-    /// Apps with any audio going on, and those of them that have the microphone open.
-    static func audioApps() -> (audible: Set<MeetingApp>, microphone: Set<MeetingApp>) {
-        let me = getpid()
+    /// The apps of the processes with audio going on, and those of them that have the microphone open.
+    private func audioApps() -> (audible: Set<MeetingApp>, microphone: Set<MeetingApp>) {
         var audible = Set<MeetingApp>(), microphone = Set<MeetingApp>()
-        for process in AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList) {
-            let pid = process.get(kAudioProcessPropertyPID, pid_t(-1))
-            guard pid != me, process.get(kAudioProcessPropertyIsRunning, UInt32(0)) == 1, let app = app(of: process, pid: pid) else { continue }
+        var found: [AudioObjectID: MeetingApp?] = [:]
+        for process in running {
+            let app = apps[process] ?? Self.app(of: process)
+            found.updateValue(app, forKey: process)
+            guard let app else { continue }
             audible.insert(app)
             if process.get(kAudioProcessPropertyIsRunningInput, UInt32(0)) == 1 { microphone.insert(app) }
         }
+        apps = found // a process looked up again when it starts again
         return (audible, microphone)
     }
 
     /// The app's audio processes, helpers included: what a tap needs to record only that app.
     static func processes(of app: MeetingApp) -> [AudioObjectID] {
-        let me = getpid()
-        return AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter { process in
-            let pid = process.get(kAudioProcessPropertyPID, pid_t(-1))
-            return pid != me && Self.app(of: process, pid: pid) == app
-        }
+        AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter { Self.app(of: $0) == app }
     }
 
-    private static func app(of process: AudioObjectID, pid: pid_t) -> MeetingApp? {
+    /// None for Reprise itself.
+    private static func app(of process: AudioObjectID) -> MeetingApp? {
+        let pid = process.get(kAudioProcessPropertyPID, pid_t(-1))
+        guard pid != getpid() else { return nil }
         // Helpers share the process group of the app that launched them, so the group
         // leader tells Dia's "company.thebrowser.browser.helper" apart from Arc's.
         let owner = NSRunningApplication(processIdentifier: getpgid(pid))

@@ -10,7 +10,7 @@ import Synchronization
 /// Each IO cycle is mixed down to mono and appended to the file.
 nonisolated final class AudioRecorder: @unchecked Sendable {
     private let url: URL
-    let processes: [AudioObjectID]
+    private let processes: [AudioObjectID]
     private let queue = DispatchQueue(label: "dev.nikiomori.reprise.audio", qos: .userInteractive)
     private var tapID = AudioObjectID.unknown
     private var deviceID = AudioObjectID.unknown
@@ -24,7 +24,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let heardThem = Mutex(false)
     private let written = Mutex(0)
     private let started = Mutex<UInt64?>(nil)
-    private var latency: UInt64 = 0 // nanoseconds
+    private var lead: UInt64 = 0 // nanoseconds
 
     /// `processes` empty: the whole Mac.
     init(url: URL, processes: [AudioObjectID] = []) {
@@ -41,8 +41,21 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     /// Frames that made it into the file. Stuck while the device is gone or the disk is full.
     var framesWritten: Int { written.withLock { $0 } }
 
-    /// Host time when the sound in the file's first frame played, to line the screen recording up with it.
-    var startHostTime: UInt64? { started.withLock { $0 }.map { $0 - AudioConvertNanosToHostTime(latency) } }
+    /// Host time when the sound at the file's time zero played, to line the screen recording up with it.
+    var startHostTime: UInt64? { started.withLock { $0 }.map { $0 - AudioConvertNanosToHostTime(lead) } }
+
+    /// AAC-LC opens every file with this many frames of encoder delay, and the ADTS stream doesn't
+    /// say so: every player puts the first recorded frame 44 ms (at 48 kHz) into the file.
+    static let encoderDelay = 2112
+
+    static func fileSettings(rate: Double) -> [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: rate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+        ]
+    }
 
     /// Peak level (0...1) since the last read; read it from the UI at frame rate.
     func readLevel() -> Float { peak.withLock { level in defer { level = 0 }; return level } }
@@ -83,20 +96,15 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             try check("create the recording device", AudioHardwareCreateAggregateDevice(description as CFDictionary, &deviceID))
 
             let rate = deviceID.get(kAudioDevicePropertyNominalSampleRate, Float64(48_000))
-            // The drift-compensated tap hands over the Mac's sound late: 2399 frames, 50 ms, on a MacBook.
-            let frames = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
-            latency = UInt64(Double(frames) / rate * 1e9)
-            file = try AVAudioFile(
-                forWriting: url,
-                settings: [
-                    AVFormatIDKey: kAudioFormatMPEG4AAC,
-                    AVSampleRateKey: rate,
-                    AVNumberOfChannelsKey: 1,
-                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
-                ],
-                commonFormat: .pcmFormatFloat32,
-                interleaved: false
-            )
+            // An IO cycle every 40 ms instead of every 10: each one wakes Reprise up, and a
+            // recording needs no low latency. Measured: a quarter less CPU while recording.
+            let range = deviceID.get(kAudioDevicePropertyBufferFrameSizeRange, AudioValueRange())
+            deviceID.set(kAudioDevicePropertyBufferFrameSize, UInt32(min(rate / 25, range.mMaximum)))
+            // The file's time zero lies before the first IO cycle: the drift-compensated tap hands over
+            // the Mac's sound late (2399 frames, 50 ms, on a MacBook), and then comes the encoder delay.
+            let tapLatency = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
+            lead = UInt64(Double(Int(tapLatency) + Self.encoderDelay) / rate * 1e9)
+            file = try AVAudioFile(forWriting: url, settings: Self.fileSettings(rate: rate), commonFormat: .pcmFormatFloat32, interleaved: false)
             mix = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!, frameCapacity: 16_384)
 
             try check("start recording", AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, inputTime, _, _ in

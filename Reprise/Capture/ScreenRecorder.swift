@@ -1,20 +1,24 @@
+import AVFoundation
 import ScreenCaptureKit
 import Synchronization
+import VideoToolbox
 
-/// Records the main display (minus Reprise's own windows) with system audio and the
-/// microphone mixed in, straight to a movie file via `SCRecordingOutput`.
-nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @unchecked Sendable {
+/// Records the display that shows the call (minus Reprise's own windows) to a HEVC movie
+/// without sound: the store gives it the call's sound from `audio.m4a` when the recording
+/// stops, so nothing captures the microphone or the Mac's sound a second time.
+///
+/// Its own writer, because `SCRecordingOutput` takes no bitrate: it wrote 9–47 Mbit/s where
+/// HEVC at quality 0.65 writes 0.5–6 and looks the same. The movie goes to disk in 5-second
+/// fragments, so a crash costs only its last seconds.
+nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     private var stream: SCStream?
-    private let state = Mutex(State.recording)
+    private var writer: AVAssetWriter?
+    private var input: AVAssetWriterInput?
+    private let queue = DispatchQueue(label: "dev.nikiomori.reprise.screen", qos: .userInitiated)
     private let started = Mutex<UInt64?>(nil)
 
-    /// Host time the movie starts at.
+    /// Host time of the movie's first frame.
     var startHostTime: UInt64? { started.withLock { $0 } }
-
-    private enum State {
-        case recording, finished
-        case waiting(CheckedContinuation<Void, Never>)
-    }
 
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
@@ -35,7 +39,7 @@ nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @un
         let reprise = content.applications.filter { $0.processID == getpid() }
         let filter = SCContentFilter(display: display, excludingApplications: reprise, exceptingWindows: [])
 
-        // Native resolution, capped so a one-hour call doesn't fill the disk.
+        // Native resolution, capped: past 2560 pixels a call's picture gains little but size.
         var size = CGSize(width: filter.contentRect.width * CGFloat(filter.pointPixelScale),
                           height: filter.contentRect.height * CGFloat(filter.pointPixelScale))
         let scale = min(1, 2560 / max(size.width, size.height))
@@ -46,47 +50,52 @@ nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @un
         config.height = Int(size.height) & ~1
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         config.showsCursor = true
-        // All the sound of the Mac, even with "only the call app" on: a filter that limits the sound
-        // to one app limits the picture to its windows too. The store swaps in the call's sound on stop.
-        config.capturesAudio = true
-        config.excludesCurrentProcessAudio = true
-        config.captureMicrophone = true
-        config.microphoneCaptureDeviceID = AudioObjectID.recordingMicrophone.string(kAudioDevicePropertyDeviceUID)
+        config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange // what the encoder takes, at 3/8 the memory of BGRA
 
-        let output = SCRecordingOutputConfiguration()
-        output.outputURL = url
-        output.outputFileType = .mov
-        if output.availableVideoCodecTypes.contains(.hevc) { output.videoCodecType = .hevc }
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        writer.movieFragmentInterval = CMTime(value: 5, timescale: 1)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.hevc,
+            AVVideoWidthKey: config.width,
+            AVVideoHeightKey: config.height,
+            AVVideoCompressionPropertiesKey: [
+                AVVideoQualityKey: 0.65,
+                AVVideoExpectedSourceFrameRateKey: 30,
+                AVVideoMaxKeyFrameIntervalDurationKey: 4, // seeking never decodes more than 4 s
+                kVTCompressionPropertyKey_RealTime as String: true,
+            ] as [String: Any],
+        ])
+        input.expectsMediaDataInRealTime = true
+        writer.add(input)
+        guard writer.startWriting() else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
+        (self.writer, self.input) = (writer, input)
 
         let stream = SCStream(filter: filter, configuration: config, delegate: nil)
-        try stream.addRecordingOutput(SCRecordingOutput(configuration: output, delegate: self))
+        try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         try await stream.startCapture()
         self.stream = stream
     }
 
     func stop() async {
-        guard let stream else { return }
+        guard let stream, let writer, let input else { return }
         self.stream = nil
         try? await stream.stopCapture()
-        Task { [self] in
-            try? await Task.sleep(for: .seconds(5))
-            finish() // safety net in case the delegate never reports back
-        }
-        await withCheckedContinuation { continuation in
-            state.withLock { state in
-                if case .finished = state { continuation.resume() } else { state = .waiting(continuation) }
-            }
-        }
+        await withCheckedContinuation { done in queue.async { done.resume() } } // the last frame is in
+        // A screen that stood still at the end still lasts until now.
+        if startHostTime != nil { writer.endSession(atSourceTime: CMClockGetTime(CMClockGetHostTimeClock())) }
+        input.markAsFinished()
+        await writer.finishWriting()
     }
 
-    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) { started.withLock { $0 = mach_absolute_time() } }
-    func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) { finish() }
-    func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: any Error) { finish() }
-
-    private func finish() {
-        state.withLock { state in
-            if case .waiting(let continuation) = state { continuation.resume() }
-            state = .finished
+    func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        // Only frames with new pixels: while the screen stands still, ScreenCaptureKit sends empty ones.
+        guard type == .screen, let writer, let input,
+              let info = (CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first,
+              (info[.status] as? Int).flatMap(SCFrameStatus.init) == .complete else { return }
+        if startHostTime == nil {
+            writer.startSession(atSourceTime: buffer.presentationTimeStamp)
+            started.withLock { $0 = CMClockConvertHostTimeToSystemUnits(buffer.presentationTimeStamp) }
         }
+        if input.isReadyForMoreMediaData { input.append(buffer) } // a busy encoder drops a frame, never stalls capture
     }
 }

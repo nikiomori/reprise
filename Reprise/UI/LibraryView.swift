@@ -402,23 +402,28 @@ nonisolated private struct WaveformShape: Shape {
 }
 
 nonisolated enum Waveform {
-    /// Loudness envelope of an audio file, normalized to 0...1.
-    static func peaks(of url: URL, count: Int) async -> [Float] {
-        await Task.detached(priority: .utility) {
-            guard let file = try? AVAudioFile(forReading: url), file.length > 0 else { return [] }
-            let perBucket = AVAudioFrameCount(max(1, file.length / Int64(count)))
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: perBucket) else { return [] }
-            var peaks: [Float] = []
-            while peaks.count < count, (try? file.read(into: buffer, frameCount: perBucket)) != nil, buffer.frameLength > 0 {
-                let samples = UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))
-                let rms = (samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
-                peaks.append(rms)
-            }
-            peaks += Array(repeating: 0, count: count - peaks.count)
-            let loudest = peaks.max() ?? 0
-            guard loudest > 0 else { return peaks }
-            return peaks.map { ($0 / loudest).squareRoot() }
-        }.value
+    /// Loudness envelope of an audio file, normalized to 0...1. Decoding an hour of audio takes
+    /// 0.7 s of CPU, so the result waits next to the file, hidden, for the next time.
+    @concurrent static func peaks(of url: URL, count: Int) async -> [Float] {
+        let saved = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).waveform")
+        if let data = try? Data(contentsOf: saved), data.count == count * MemoryLayout<Float>.size {
+            return data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        }
+        guard let file = try? AVAudioFile(forReading: url), file.length > 0 else { return [] }
+        let perBucket = AVAudioFrameCount(max(1, file.length / Int64(count)))
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: perBucket) else { return [] }
+        var peaks: [Float] = []
+        while peaks.count < count, (try? file.read(into: buffer, frameCount: perBucket)) != nil, buffer.frameLength > 0 {
+            guard !Task.isCancelled else { return [] } // the next call was selected before this one's wave was done
+            let samples = UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))
+            let rms = (samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
+            peaks.append(rms)
+        }
+        peaks += Array(repeating: 0, count: count - peaks.count)
+        let loudest = peaks.max() ?? 0
+        if loudest > 0 { peaks = peaks.map { ($0 / loudest).squareRoot() } }
+        try? peaks.withUnsafeBytes { Data($0) }.write(to: saved)
+        return peaks
     }
 }
 

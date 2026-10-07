@@ -150,8 +150,6 @@ private struct IslandEntrance: ViewModifier {
 private struct PromptContent: View {
     let app: MeetingApp
     let model: AppModel
-    @State private var appeared = Date.now
-    private let timeout = AppModel.promptSeconds
 
     var body: some View {
         HStack(spacing: 12) {
@@ -173,15 +171,7 @@ private struct PromptContent: View {
             .keyboardShortcut(.defaultAction)
             Button(action: model.dismissPrompt) {
                 Image(systemName: "xmark").fontWeight(.semibold)
-                    .overlay {
-                        TimelineView(.animation) { context in
-                            Circle()
-                                .trim(from: 0, to: max(0, 1 - context.date.timeIntervalSince(appeared) / timeout))
-                                .stroke(.secondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                                .frame(width: 26, height: 26)
-                        }
-                    }
+                    .overlay { CountdownRing(duration: AppModel.promptSeconds).frame(width: 26, height: 26) }
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
@@ -332,15 +322,14 @@ private struct SavedContent: View {
 
 // MARK: - Pieces
 
+/// Plain digits once a second. Rolling ones (`numericText`) redrew the island at the display's
+/// frame rate for half of every second: 7% CPU for the whole call.
 struct ElapsedTime: View {
     let since: Date
 
     var body: some View {
         TimelineView(.periodic(from: since, by: 1)) { context in
-            Text(context.date.timeIntervalSince(since).clock)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.snappy, value: Int(context.date.timeIntervalSince(since)))
+            Text(context.date.timeIntervalSince(since).clock).monospacedDigit()
         }
     }
 }
@@ -381,32 +370,111 @@ struct LevelMeter: View {
 /// Each lights up when its side speaks, so a glance shows that both sides are recorded.
 struct VoiceDots: View {
     let levels: () -> (you: Float, them: Float)
-    @State private var you = 0.0
-    @State private var them = 0.0
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 15)) { context in
-            VStack(spacing: 4) {
-                dot(.white, you)
-                dot(.red, them)
+        DotLayers(levels: levels)
+            .frame(width: 7, height: 18)
+            .accessibilityElement()
+            .accessibilityLabel("Recording you and the other people")
+    }
+}
+
+/// Core Animation layers on a 15 Hz timer. As a SwiftUI timeline, every tick laid out and
+/// redrew the whole island: 6% CPU for the whole call. Changing a layer's opacity costs nothing.
+private struct DotLayers: NSViewRepresentable {
+    let levels: () -> (you: Float, them: Float)
+
+    func makeNSView(context: Context) -> DotsView { DotsView(levels: levels) }
+    func updateNSView(_ view: DotsView, context: Context) { view.levels = levels }
+
+    final class DotsView: NSView {
+        var levels: () -> (you: Float, them: Float)
+        private let dots = [CALayer(), CALayer()]
+        private var shown = [0.0, 0.0]
+        private var timer: Timer?
+
+        init(levels: @escaping () -> (you: Float, them: Float)) {
+            self.levels = levels
+            super.init(frame: CGRect(x: 0, y: 0, width: 7, height: 18))
+            wantsLayer = true
+            for (dot, (color, y)) in zip(dots, [(NSColor.white, 11.0), (.systemRed, 0)]) {
+                dot.frame = CGRect(x: 0, y: y, width: 7, height: 7)
+                dot.cornerRadius = 3.5
+                dot.backgroundColor = color.darkCGColor
+                dot.shadowColor = color.darkCGColor
+                dot.shadowOffset = .zero
+                dot.shadowPath = CGPath(ellipseIn: dot.bounds, transform: nil)
+                layer?.addSublayer(dot)
             }
-            .onChange(of: context.date) {
-                let peaks = levels()
-                you = LevelMeter.follow(you, peaks.you)
-                them = LevelMeter.follow(them, peaks.them)
-            }
+            show()
         }
-        .accessibilityElement()
-        .accessibilityLabel("Recording you and the other people")
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        /// Ticks only while the dots are on screen.
+        override func viewDidMoveToWindow() {
+            timer?.invalidate()
+            timer = nil
+            guard window != nil else { return }
+            let timer = Timer(timeInterval: 1 / 15, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.show() }
+            }
+            timer.tolerance = 0.01
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        }
+
+        private func show() {
+            let peaks = levels()
+            shown = [LevelMeter.follow(shown[0], peaks.you), LevelMeter.follow(shown[1], peaks.them)]
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for (dot, level) in zip(dots, shown) {
+                dot.opacity = Float(0.4 + 0.6 * level)
+                dot.shadowOpacity = Float(level)
+                dot.shadowRadius = 4 * level
+                dot.setAffineTransform(CGAffineTransform(scaleX: 1 + 0.25 * level, y: 1 + 0.25 * level))
+            }
+            CATransaction.commit()
+        }
+    }
+}
+
+/// The prompt's 20 seconds running out, animated by Core Animation itself: a SwiftUI timeline
+/// redrew the whole island at the display's frame rate for as long as the prompt showed.
+private struct CountdownRing: NSViewRepresentable {
+    let duration: TimeInterval
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.wantsLayer = true
+        let ring = CAShapeLayer()
+        let path = CGMutablePath()
+        path.addArc(center: CGPoint(x: 13, y: 13), radius: 13, startAngle: .pi / 2, endAngle: -1.5 * .pi, clockwise: true) // from 12 o'clock
+        ring.path = path
+        ring.fillColor = nil
+        ring.strokeColor = NSColor.secondaryLabelColor.darkCGColor
+        ring.lineWidth = 1.5
+        ring.lineCap = .round
+        ring.strokeEnd = 0
+        let shrink = CABasicAnimation(keyPath: "strokeEnd")
+        shrink.fromValue = 1
+        shrink.duration = duration
+        shrink.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 30, preferred: 30) // 0.5 pt a step at most
+        ring.add(shrink, forKey: nil)
+        view.layer?.addSublayer(ring)
+        return view
     }
 
-    private func dot(_ color: Color, _ level: Double) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: 7, height: 7)
-            .opacity(0.4 + 0.6 * level)
-            .shadow(color: color.opacity(level), radius: 4 * level)
-            .scaleEffect(1 + 0.25 * level)
+    func updateNSView(_ view: NSView, context: Context) {}
+}
+
+private extension NSColor {
+    /// The island is always dark.
+    var darkCGColor: CGColor {
+        var color = cgColor
+        NSAppearance(named: .darkAqua)?.performAsCurrentDrawingAppearance { color = cgColor }
+        return color
     }
 }
 

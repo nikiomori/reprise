@@ -34,6 +34,12 @@ nonisolated extension AudioObjectID {
         return AudioObjectGetPropertyData(self, &address, 0, nil, &size, &value) == noErr ? value : fallback
     }
 
+    func set<T: BitwiseCopyable>(_ selector: AudioObjectPropertySelector, _ value: T) {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var value = value
+        AudioObjectSetPropertyData(self, &address, 0, nil, UInt32(MemoryLayout<T>.size), &value)
+    }
+
     func ids(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> [AudioObjectID] {
         var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0

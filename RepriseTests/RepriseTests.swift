@@ -119,3 +119,23 @@ struct WaveformTests {
         #expect(peaks.count == 120)
     }
 }
+
+struct EncoderDelayTests {
+    /// A click written at 1 s plays `encoderDelay` frames later: the screen recording's sound is lined up by it.
+    @Test func aacStartsLateByTheEncoderDelay() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-delay-\(UUID()).aac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let file = try AVAudioFile(forWriting: url, settings: AudioRecorder.fileSettings(rate: 48_000), commonFormat: .pcmFormatFloat32, interleaved: false)
+        let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!, frameCapacity: 96_000)!
+        buffer.frameLength = 96_000
+        for i in 48_000..<48_096 { buffer.floatChannelData![0][i] = 0.9 * sin(Float(i) * 2 * .pi / 24) } // 2 kHz
+        try file.write(from: buffer)
+        file.close()
+
+        let back = try AVAudioFile(forReading: url)
+        let read = AVAudioPCMBuffer(pcmFormat: back.processingFormat, frameCapacity: AVAudioFrameCount(back.length))!
+        try back.read(into: read)
+        let onset = UnsafeBufferPointer(start: read.floatChannelData![0], count: Int(read.frameLength)).firstIndex { abs($0) > 0.2 }
+        #expect(onset.map { abs($0 - (48_000 + AudioRecorder.encoderDelay)) < 24 } == true)
+    }
+}

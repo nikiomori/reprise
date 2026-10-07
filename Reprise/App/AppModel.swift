@@ -146,7 +146,12 @@ enum IslandState: Equatable {
         var warned = false
         while true {
             try? await Task.sleep(for: .seconds(5))
-            guard session?.recording.id == id else { return }
+            guard let session, session.recording.id == id else { return }
+            // Saved once known, so a movie cut short by a crash still gets its sound.
+            if session.recording.movieStart == nil, let start = Self.movieStart(in: session) {
+                self.session?.recording.movieStart = start
+                store.save(self.session!.recording)
+            }
             let now = audio.framesWritten
             let problem = !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
                 : now == written ? "The recording stopped getting sound. Check the microphone and the free disk space."
@@ -240,7 +245,8 @@ enum IslandState: Equatable {
         await session.screen?.stop()
         var recording = session.recording
         recording.duration = Date.now.timeIntervalSince(recording.startedAt)
-        recording = await store.finalize(recording, callSoundFrom: Self.movieStart(in: session))
+        recording.movieStart = recording.movieStart ?? Self.movieStart(in: session)
+        recording = await store.finalize(recording)
         log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
         show(.saved(recording), for: .seconds(5))
         if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey), TranscriptionSettings.service != nil {
@@ -248,10 +254,9 @@ enum IslandState: Equatable {
         }
     }
 
-    /// Seconds into the audio where the movie starts, when the audio has only the call app and
-    /// the movie, which always has the whole Mac, should get the audio's sound.
+    /// Seconds into the audio where the movie starts.
     private static func movieStart(in session: Session) -> TimeInterval? {
-        guard !session.audio.processes.isEmpty, let audio = session.audio.startHostTime, let movie = session.screen?.startHostTime else { return nil }
+        guard let audio = session.audio.startHostTime, let movie = session.screen?.startHostTime else { return nil }
         return (Double(AudioConvertHostTimeToNanos(movie)) - Double(AudioConvertHostTimeToNanos(audio))) / 1e9
     }
 

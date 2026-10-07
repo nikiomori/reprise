@@ -198,7 +198,7 @@ Reprise keeps each recording in a folder in `~/Movies/Reprise`:
 └── transcript.txt   the text, if you transcribed the recording
 ```
 
-During a recording, Reprise writes the audio to `audio.aac`. This format stays usable if the Mac stops unexpectedly. When the recording stops, Reprise changes the file to `audio.m4a`. If a recording stopped unexpectedly, Reprise repairs it at the next start.
+During a recording, Reprise writes the audio to `audio.aac`. This format stays usable if the Mac stops unexpectedly. When the recording stops, Reprise changes the file to `audio.m4a`. Reprise writes `screen.mov` in parts of 5 seconds, so an unexpected stop loses only the last seconds of the screen. If a recording stopped unexpectedly, Reprise repairs it at the next start.
 
 When you delete a recording, Reprise moves it to the Trash.
 
@@ -222,9 +222,9 @@ To run the tests, use `xcodebuild -scheme Reprise test`.
 ## How Reprise works
 
 - **Call detection.** Core Audio tells Reprise when an app starts or stops audio. Then Reprise finds the apps that use the microphone (`kAudioProcessPropertyIsRunningInput`). When no call occurs, Reprise does no work.
-- **Audio.** A private aggregate device connects the microphone and a Core Audio process tap. The tap captures the audio of all apps except Reprise. If you select **Record only the sound of the call app** in Settings, the tap captures only the processes of the call app, its helper processes included. A screen recording always captures all the sound of the Mac, so when the recording stops, Reprise replaces the sound of `screen.mov` with `audio.m4a`. The two sources use one clock, so they stay in sync.
+- **Audio.** A private aggregate device connects the microphone and a Core Audio process tap. The tap captures the audio of all apps except Reprise. If you select **Record only the sound of the call app** in Settings, the tap captures only the processes of the call app, its helper processes included. The two sources use one clock, so they stay in sync.
 - **Headphones.** When an app opens the microphone of Bluetooth headphones, macOS changes the headphones to their call mode: the sound becomes mono, and the volume changes. Reprise does not cause this change. If no app uses the headphone microphone, Reprise records the built-in microphone of the Mac. When the call app stops all audio, Reprise stops the recording immediately. Thus the headphones go back to their usual mode at the end of the call.
-- **Screen.** ScreenCaptureKit writes the screen and the sound to a movie file (`SCRecordingOutput`).
+- **Screen.** ScreenCaptureKit captures the screen, and Reprise encodes it with HEVC at a fixed quality (`AVAssetWriter`). A screen that does not change uses almost no space. The movie gets no sound of its own: when the recording stops, Reprise adds the sound of `audio.m4a` to `screen.mov` without a new encoding. Thus Reprise does not capture the microphone and the Mac a second time.
 - **Interface.** Reprise uses SwiftUI and Liquid Glass. It has no third-party dependencies.
 
 [docs/PLAN.md](docs/PLAN.md) gives the full design, the research about transcription, and the roadmap.

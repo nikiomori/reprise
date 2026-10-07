@@ -12,6 +12,8 @@ struct Recording: Codable, Identifiable, Hashable {
     let startedAt: Date
     var duration: TimeInterval
     var hasVideo: Bool
+    /// Seconds into the audio where the movie starts. The movie, recorded without sound, gets the audio from there.
+    var movieStart: TimeInterval?
 
     var folder: URL { RecordingStore.root.appending(path: id, directoryHint: .isDirectory) }
     var finalAudioURL: URL { folder.appending(path: "audio.m4a") }
@@ -89,17 +91,18 @@ struct Recording: Codable, Identifiable, Hashable {
         }
     }
 
-    /// Repackages the crash-safe ADTS stream into a regular `.m4a` (no re-encoding) and saves.
-    /// `callSoundFrom`: seconds into the audio where the movie starts, to give the movie the audio's sound.
+    /// Repackages the crash-safe ADTS stream into a regular `.m4a` (no re-encoding), gives the
+    /// movie its sound, and saves.
     @discardableResult
-    func finalize(_ recording: Recording, callSoundFrom offset: TimeInterval? = nil) async -> Recording {
+    func finalize(_ recording: Recording) async -> Recording {
         var recording = recording
         if FileManager.default.fileExists(atPath: recording.partialAudioURL.path),
            (try? await Self.remux(recording.partialAudioURL, to: recording.finalAudioURL)) != nil {
             try? FileManager.default.removeItem(at: recording.partialAudioURL)
         }
-        if recording.hasVideo, let offset, (try? await Self.replaceSound(of: recording.videoURL, with: recording.finalAudioURL, from: offset)) == nil {
-            log.error("The movie keeps the sound of the whole Mac: its sound couldn't be replaced")
+        if recording.hasVideo, let offset = recording.movieStart,
+           (try? await Self.replaceSound(of: recording.videoURL, with: recording.finalAudioURL, from: offset)) == nil {
+            log.error("The movie has no sound: the call's sound couldn't be added")
         }
         if recording.duration == 0, let seconds = try? await AVURLAsset(url: recording.audioURL).load(.duration).seconds {
             recording.duration = seconds // a recording cut short by a crash
