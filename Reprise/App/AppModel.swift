@@ -62,10 +62,15 @@ enum IslandState: Equatable {
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [unowned self] _ in
             MainActor.assumeIsolated { detector.forgetCalls() }
         }
-        // Finish recordings that were cut short last time (crash, force quit, power loss).
+        // Finish recordings that were cut short last time (crash, force quit, power loss). Until then
+        // they're being saved: not shared, trashed or transcribed mid-save. Quitting mid-save is fine,
+        // the next launch does it again.
         Task {
-            for recording in store.recordings where FileManager.default.fileExists(atPath: recording.partialAudioURL.path) {
+            let cut = store.recordings.filter { FileManager.default.fileExists(atPath: $0.partialAudioURL.path) }
+            saving.formUnion(cut.map(\.id))
+            for recording in cut {
                 await store.finalize(recording)
+                saving.remove(recording.id)
             }
         }
     }
