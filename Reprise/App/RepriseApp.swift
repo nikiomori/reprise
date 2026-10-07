@@ -51,7 +51,7 @@ struct RepriseApp: App {
     }
 }
 
-/// File menu: what a Mac app's menu bar is expected to offer while its window is open.
+/// File and Help menus: what a Mac app's menu bar is expected to offer while its window is open.
 private struct RecordingCommands: Commands {
     let model: AppModel
 
@@ -63,6 +63,10 @@ private struct RecordingCommands: Commands {
             Button("Stop Recording") { Task { await model.stopRecording() } }
                 .keyboardShortcut(".")
                 .disabled(model.session == nil)
+        }
+        // Instead of the default item, which only says help isn't available.
+        CommandGroup(replacing: .help) {
+            Link("Reprise on GitHub", destination: URL(string: "https://github.com/nikiomori/reprise")!)
         }
     }
 }
