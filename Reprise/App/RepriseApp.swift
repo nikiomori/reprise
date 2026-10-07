@@ -107,9 +107,20 @@ private struct MenuBarIcon: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @State private var now = Date.now
 
     var body: some View {
-        Image(nsImage: .repriseGlyph(recording: model.session != nil))
+        // With the pill hidden, the menu bar keeps the call's time in sight.
+        let since = model.pillHidden ? model.session?.recording.startedAt : nil
+        Image(nsImage: .repriseGlyph(recording: model.session != nil, time: since.map { max(0, now.timeIntervalSince($0)).clock }))
+            // Ticked by hand: a TimelineView in a menu bar label locks SwiftUI in an endless update at launch.
+            .task(id: since) {
+                guard let since else { return }
+                while !Task.isCancelled {
+                    now = .now
+                    try? await Task.sleep(for: .seconds(1 - now.timeIntervalSince(since).truncatingRemainder(dividingBy: 1)))
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .openRepriseWindow)) { note in
                 let id = note.object as? String ?? "library"
                 id == "settings" ? openSettings() : openWindow(id: id)
@@ -126,8 +137,13 @@ extension Notification.Name {
 extension NSImage {
     /// The logo's repeat sign  :‖  sized for the menu bar. The lower dot — the other side of
     /// the call — turns red while recording; otherwise it's a template the system tints.
-    static func repriseGlyph(recording: Bool) -> NSImage {
-        let image = NSImage(size: NSSize(width: 15, height: 16), flipped: true) { _ in
+    /// `time` follows the sign in digits that keep their width: the menu bar ignores a label's font.
+    static func repriseGlyph(recording: Bool, time: String? = nil) -> NSImage {
+        let text = time.map { NSAttributedString(string: $0, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+            .foregroundColor: NSColor.labelColor,
+        ]) }
+        let image = NSImage(size: NSSize(width: text.map { 20 + ceil($0.size().width) } ?? 15, height: 16), flipped: true) { _ in
             let ink = recording ? NSColor.labelColor : .black
             ink.setFill()
             NSBezierPath(ovalIn: NSRect(x: 0.5, y: 4, width: 3.4, height: 3.4)).fill()
@@ -135,6 +151,7 @@ extension NSImage {
             NSBezierPath(roundedRect: NSRect(x: 8.9, y: 1, width: 5.2, height: 14), xRadius: 1.4, yRadius: 1.4).fill()
             (recording ? NSColor.systemRed : ink).setFill()
             NSBezierPath(ovalIn: NSRect(x: 0.5, y: 8.6, width: 3.4, height: 3.4)).fill()
+            if let text { text.draw(at: NSPoint(x: 20, y: (16 - text.size().height) / 2)) }
             return true
         }
         image.isTemplate = !recording

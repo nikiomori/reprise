@@ -258,6 +258,7 @@ private struct RecordingContent: View {
         .padding(.trailing, expanded ? 6 : 14)
         .frame(height: expanded ? 40 : 32)
         .contentShape(.capsule)
+        .onTapGesture(count: 2, perform: model.hidePill)
         .onHover { hovering in
             withAnimation(.spring(duration: 0.4, bounce: 0.3)) { expanded = hovering }
         }

@@ -152,8 +152,11 @@ Reprise also finds other apps that use the microphone for more than 10 seconds. 
 
 - To move the pill, drag it. Reprise keeps the new position.
 - To move the pill to the top center again, right-click it. Then select **Move Back to the Top**.
-- To hide the pill until the call ends, right-click it. Then select **Hide Until the Call Ends**.
+- To hide the pill until the call ends, double-click it. Or right-click it and select **Hide Until the Call Ends**.
+- To show the pill again, click the Reprise icon in the menu bar. Then select **Show the Floating Pill**.
 - To hide the pill for all recordings, open **Settings > General**. Then clear **Show the floating pill while recording**.
+
+When the pill is hidden, the menu bar shows the time of the recording next to the Reprise icon.
 
 ### Find a recording
 
