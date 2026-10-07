@@ -219,6 +219,14 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         }
     }
 
+    /// After sleep: the recording stopped as the Mac went to sleep, so a call going on after the
+    /// wake (Zoom and Meet reconnect) starts again, with its prompt or Always Record.
+    func forgetCalls() {
+        active = []
+        firstSeen = [:]
+        lastSeen = [:]
+    }
+
     /// The apps of the processes with audio going on, and those of them that have the microphone open.
     private func audioApps() -> (audible: Set<MeetingApp>, microphone: Set<MeetingApp>) {
         var audible = Set<MeetingApp>(), microphone = Set<MeetingApp>()

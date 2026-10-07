@@ -90,13 +90,17 @@ struct MixDownTests {
 
     typealias Step = (after: TimeInterval, microphone: Set<MeetingApp>, audible: Set<MeetingApp>)
 
-    private func events(_ steps: [Step]) -> [String] {
+    /// `wakingAt`: the step the Mac wakes up before.
+    private func events(_ steps: [Step], wakingAt wake: Int? = nil) -> [String] {
         let detector = MeetingDetector()
         var events: [String] = []
         detector.onStart = { events.append("start \($0.name)") }
         detector.onEnd = { events.append("end \($0.name)") }
         let start = Date.now
-        for step in steps { detector.update(now: start + step.after, microphone: step.microphone, audible: step.audible) }
+        for (index, step) in steps.enumerated() {
+            if index == wake { detector.forgetCalls() }
+            detector.update(now: start + step.after, microphone: step.microphone, audible: step.audible)
+        }
         return events
     }
 
@@ -110,6 +114,14 @@ struct MixDownTests {
         #expect(events(muted) == ["start Zoom"])
         #expect(events(muted + [(201, [], [])]) == ["start Zoom", "end Zoom"]) // silent: the call is over
         #expect(events(muted + [(303, [], [zoom])]) == ["start Zoom", "end Zoom"]) // sound left running after the call
+    }
+
+    /// The recording stopped at sleep, so a call that goes on after the wake gets its prompt again.
+    @Test func callGoingOnAfterSleepStartsAgain() {
+        let call: [Step] = [(0, [zoom], [zoom]), (2, [zoom], [zoom])]
+        let reconnected: [Step] = [(600, [zoom], [zoom]), (602, [zoom], [zoom])]
+        #expect(events(call + reconnected) == ["start Zoom"])
+        #expect(events(call + reconnected, wakingAt: 2) == ["start Zoom", "start Zoom"])
     }
 
     @Test func browserEndsSoonAfterTheMicCloses() {

@@ -51,9 +51,14 @@ enum IslandState: Equatable {
         guard !isTesting else { return } // no calls and no repairs: the tests drive the pieces themselves
         detector.start()
         store.deleteUnanswered()
-        // No call goes on through sleep, but the recording would after it: the room all night long.
+        // Otherwise the recording goes on through sleep: the room all night long.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [unowned self] _ in
             Task { @MainActor in await stopRecording() }
+        }
+        // So a call still on after the wake is recorded anew. Not at sleep: a check before the Mac
+        // is asleep would find the call again and record it.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [unowned self] _ in
+            MainActor.assumeIsolated { detector.forgetCalls() }
         }
         // Finish recordings that were cut short last time (crash, force quit, power loss).
         Task {
