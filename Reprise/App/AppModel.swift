@@ -110,7 +110,10 @@ enum IslandState: Equatable {
                 recording = try store.create(app: app, at: .now)
                 audio = AudioRecorder(url: recording.partialAudioURL, processes: tapped(app))
                 // Off the main thread: the first start blocks while macOS shows its permission prompt.
-                try await Task.detached { try audio.start() }.value
+                do { try await Task.detached { try audio.start() }.value } catch {
+                    try? FileManager.default.removeItem(at: recording.folder) // nothing went into it
+                    throw error
+                }
             }
 
             // Keep the audio going without the screen; a call is more important than its picture.
