@@ -453,6 +453,7 @@ struct AppIcon: View {
         Image(nsImage: app?.icon ?? NSApp.applicationIconImage)
             .resizable()
             .frame(width: size, height: size)
+            .accessibilityHidden(true) // decoration beside the text that names the app or the call
     }
 }
 

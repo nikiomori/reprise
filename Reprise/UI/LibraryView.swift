@@ -117,7 +117,9 @@ private struct RecordingRow: View {
             }
             Spacer(minLength: 0)
             if recording.hasVideo {
-                Image(systemName: "display").font(.caption).foregroundStyle(.tertiary).help("Includes a screen recording")
+                Image(systemName: "display").font(.caption).foregroundStyle(.tertiary)
+                    .help("Includes a screen recording")
+                    .accessibilityLabel("Includes a screen recording") // not "display"
             }
         }
         .padding(.vertical, 3)
