@@ -35,7 +35,7 @@ struct MenuBarView: View {
                     .padding(.horizontal, 10)
                     .padding(.bottom, 2)
                 ForEach(recent) { recording in
-                    Button { open(recording) } label: { RecentRow(recording: recording) }
+                    Button { open(recording) } label: { RecentRow(recording: recording, isLive: model.isLive(recording)) }
                 }
             }
 
@@ -152,13 +152,15 @@ private struct MenuDivider: View {
 
 private struct RecentRow: View {
     let recording: Recording
+    let isLive: Bool
 
     var body: some View {
         HStack(spacing: 10) {
             AppIcon(app: recording.app, size: 26)
             VStack(alignment: .leading, spacing: 0) {
                 Text(recording.title).lineLimit(1)
-                Text("\(recording.startedAt.formatted(.relative(presentation: .named))) · \(recording.duration.clock)")
+                // Its length is only known once it's saved.
+                Text("\(recording.startedAt.formatted(.relative(presentation: .named))) · \(isLive ? Text("Recording").foregroundStyle(.red) : Text(recording.duration.clock))")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
