@@ -12,7 +12,8 @@ struct Recording: Codable, Identifiable, Equatable {
     let startedAt: Date
     var duration: TimeInterval
     var hasVideo: Bool
-    /// Seconds into the audio where the movie starts. The movie, recorded without sound, gets the audio from there.
+    /// Seconds into the audio where the screen recording starts. The movie, recorded without sound,
+    /// gets all of the audio, and its picture from there.
     var movieStart: TimeInterval?
 
     var folder: URL { RecordingStore.root.appending(path: id, directoryHint: .isDirectory) }
@@ -141,21 +142,35 @@ struct Recording: Codable, Identifiable, Equatable {
         try await export.export(to: destination, as: .m4a)
     }
 
-    /// Gives the movie the sound of `audio` from `offset` seconds on, without re-encoding.
+    /// Gives the movie all of `audio`'s sound, without re-encoding. Its picture starts `offset`
+    /// seconds in, where the screen recording began, so the movie plays the call from its first second.
     nonisolated private static func replaceSound(of movie: URL, with audio: URL, from offset: TimeInterval) async throws {
         let video = AVURLAsset(url: movie), sound = AVURLAsset(url: audio)
+        // Done already: a crash before the stream went repeats the save, and the picture would move again.
+        guard try await video.loadTracks(withMediaType: .audio).isEmpty else { return }
         guard let picture = try await video.loadTracks(withMediaType: .video).first,
               let voice = try await sound.loadTracks(withMediaType: .audio).first else { throw CocoaError(.fileReadCorruptFile) }
-        let length = try await video.load(.duration)
+        let length = try await video.load(.duration), soundLength = try await sound.load(.duration)
         let start = CMTime(seconds: max(0, offset), preferredTimescale: 48_000) // the audio always starts first
-        let available = try await sound.load(.duration) - start
-        guard available > .zero else { throw CocoaError(.fileReadCorruptFile) }
+        guard soundLength > start else { throw CocoaError(.fileReadCorruptFile) }
+        let range = try await picture.load(.timeRange)
 
         let composition = AVMutableComposition()
-        try composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)?
-            .insertTimeRange(try await picture.load(.timeRange), of: picture, at: .zero)
+        let screen = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+        try screen?.insertTimeRange(range, of: picture, at: .zero)
+        // Until the screen recording began, its first frame stays on rather than a black picture: the
+        // library opens a call on its screen, and Finder still makes a thumbnail. Only that frame gets longer.
+        let firstFrame = picture.makeSampleCursor(presentationTimeStamp: range.start).map { cursor in
+            let shown = cursor.presentationTimeStamp
+            return cursor.stepInPresentationOrder(byCount: 1) == 1 ? cursor.presentationTimeStamp - shown : range.duration
+        }
+        if let firstFrame {
+            screen?.scaleTimeRange(CMTimeRange(start: .zero, duration: firstFrame), toDuration: firstFrame + start)
+        } else { // black until then
+            screen?.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: start))
+        }
         try composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)?
-            .insertTimeRange(CMTimeRange(start: start, duration: min(length, available)), of: voice, at: .zero)
+            .insertTimeRange(CMTimeRange(start: .zero, duration: min(start + length, soundLength)), of: voice, at: .zero)
 
         let temporary = movie.deletingLastPathComponent().appending(path: "screen-call.mov")
         try? FileManager.default.removeItem(at: temporary)

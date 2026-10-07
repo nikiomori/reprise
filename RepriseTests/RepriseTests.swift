@@ -206,12 +206,25 @@ struct UpdaterTests {
         #expect(first.id != second.id)
     }
 
+    /// The movie plays the call from its first second: the sound from before the screen recording
+    /// began too, over the first frame, then the picture where it was recorded.
     @Test func movieGetsTheCallsSound() async throws {
         let recording = try await screenRecording(movieStart: 0.5)
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         #expect(await store.finalize(recording).hasVideo)
         #expect(!FileManager.default.fileExists(atPath: recording.partialAudioURL.path))
-        #expect(try await AVURLAsset(url: recording.videoURL).loadTracks(withMediaType: .audio).count == 1)
+        await store.finalize(recording) // again, as after a crash mid-save: nothing moves
+        let movie = AVURLAsset(url: recording.videoURL)
+        let sound = try await movie.loadTracks(withMediaType: .audio)
+        #expect(sound.count == 1)
+        let heard = try await #require(sound.first).load(.timeRange)
+        #expect(heard.start == .zero && abs(heard.duration.seconds - 1.5) < 0.03) // the early half second, then the picture's second
+        let frames = AVAssetImageGenerator(asset: movie)
+        frames.requestedTimeToleranceBefore = .zero
+        frames.requestedTimeToleranceAfter = .zero
+        #expect(try await frames.image(at: .zero).actualTime == .zero) // the first frame, not black
+        let second = try await frames.image(at: CMTime(value: 55, timescale: 100)).actualTime.seconds
+        #expect(abs(second - (0.5 + 1.0 / 30)) < 0.002) // the second frame, as far into the sound as it was recorded
     }
 
     /// A crash before the movie's start was known: the call's sound plays, not a silent movie.
