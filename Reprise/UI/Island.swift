@@ -235,14 +235,19 @@ private struct RecordingContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        // Stopped, until "Saved" shows: nothing left to time or stop. The snapshot studio shows it with neither.
+        let saving = model.session == nil && !model.saving.isEmpty
+        let stoppable = expanded && !saving
         HStack(spacing: 10) {
             VoiceDots(levels: model.voices)
             if model.session?.screen != nil {
                 Image(systemName: "rectangle.inset.filled").font(.caption).foregroundStyle(.secondary)
             }
-            ElapsedTime(since: model.session?.recording.startedAt ?? .now)
-                .font(.system(.body, design: .rounded).weight(.semibold))
-            if expanded {
+            Group {
+                if saving { Text("Saving…") } else { ElapsedTime(since: model.session?.recording.startedAt ?? .now) }
+            }
+            .font(.system(.body, design: .rounded).weight(.semibold))
+            if stoppable {
                 Button {
                     Task { await model.stopRecording() }
                 } label: {
@@ -256,8 +261,8 @@ private struct RecordingContent: View {
             }
         }
         .padding(.leading, 14)
-        .padding(.trailing, expanded ? 6 : 14)
-        .frame(height: expanded ? 40 : 32)
+        .padding(.trailing, stoppable ? 6 : 14)
+        .frame(height: stoppable ? 40 : 32)
         .contentShape(.capsule)
         .onTapGesture(count: 2, perform: model.hidePill)
         .onHover { hovering in
@@ -271,9 +276,11 @@ private struct RecordingContent: View {
         }
         #endif
         .contextMenu {
-            Button("Stop Recording", systemImage: "stop.fill") { Task { await model.stopRecording() } }
-            Button("Hide Until the Call Ends", systemImage: "eye.slash") { model.hidePill() }
-            Divider()
+            if !saving {
+                Button("Stop Recording", systemImage: "stop.fill") { Task { await model.stopRecording() } }
+                Button("Hide Until the Call Ends", systemImage: "eye.slash") { model.hidePill() }
+                Divider()
+            }
             ResetPositionButton()
         }
     }
