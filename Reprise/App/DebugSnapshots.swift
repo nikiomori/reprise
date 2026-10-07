@@ -24,9 +24,9 @@ enum DebugSnapshots {
                 await islandStills(dir, name)
                 await menu(dir, name)
                 await window("library", dir, "library-\(name)")
-                for (tab, title) in ["general", "apps", "transcription"].enumerated() {
-                    UserDefaults.standard.set(tab, forKey: "com_apple_SwiftUI_Settings_selectedTabIndex")
-                    await window("settings", dir, "settings-\(title)-\(name)")
+                for tab in SettingsTab.allCases {
+                    UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key)
+                    await window("settings", dir, "settings-\(tab.rawValue)-\(name)")
                 }
                 await window("welcome", dir, "welcome-\(name)")
             }

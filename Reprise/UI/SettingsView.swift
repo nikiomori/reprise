@@ -2,12 +2,20 @@ import AVFoundation
 import ServiceManagement
 import SwiftUI
 
+/// Stored, so a button elsewhere can open Settings on the tab it's about.
+enum SettingsTab: String, CaseIterable {
+    case general, apps, transcription
+    static let key = "settingsTab"
+}
+
 struct SettingsView: View {
+    @AppStorage(SettingsTab.key) private var tab = SettingsTab.general
+
     var body: some View {
-        TabView {
-            Tab("General", systemImage: "gearshape") { GeneralSettings() }
-            Tab("Apps", systemImage: "app.badge.checkmark") { AppsSettings() }
-            Tab("Transcription", systemImage: "text.bubble") { TranscriptionSettingsView() }
+        TabView(selection: $tab) {
+            Tab("General", systemImage: "gearshape", value: .general) { GeneralSettings() }
+            Tab("Apps", systemImage: "app.badge.checkmark", value: .apps) { AppsSettings() }
+            Tab("Transcription", systemImage: "text.bubble", value: .transcription) { TranscriptionSettingsView() }
         }
         .frame(width: 540)
         .frame(maxHeight: 720) // a long list of apps scrolls instead of outgrowing the screen

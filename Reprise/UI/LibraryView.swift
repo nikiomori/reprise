@@ -501,6 +501,7 @@ nonisolated enum Waveform {
 private struct TranscriptSection: View {
     let recording: Recording
     let model: AppModel
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -540,7 +541,11 @@ private struct TranscriptSection: View {
                         Text("Connect a transcription service to turn calls into text.")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        SettingsLink { Text("Set Up…") }.buttonStyle(.glass)
+                        Button("Set Up…") { // on the Transcription tab, not the last one used
+                            UserDefaults.standard.set(SettingsTab.transcription.rawValue, forKey: SettingsTab.key)
+                            openSettings()
+                        }
+                        .buttonStyle(.glass)
                     }
                 }
             }
