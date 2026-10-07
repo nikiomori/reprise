@@ -182,9 +182,10 @@ private struct ShowsInDock: ViewModifier {
                 NSApp.activate()
             }
             .onDisappear {
-                // Back to a menu-bar-only app once the last window closes.
+                // Back to a menu-bar-only app once the last window closes. A minimized one isn't
+                // visible, but its Dock tile goes with the app's icon.
                 DispatchQueue.main.async {
-                    if !NSApp.windows.contains(where: { $0.isVisible && $0.styleMask.contains(.titled) }) {
+                    if !NSApp.windows.contains(where: { ($0.isVisible || $0.isMiniaturized) && $0.styleMask.contains(.titled) }) {
                         NSApp.setActivationPolicy(.accessory)
                     }
                 }
