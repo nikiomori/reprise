@@ -38,7 +38,15 @@ enum IslandState: Equatable {
     var selection: Recording.ID?
 
     var recordScreen = UserDefaults.standard.bool(forKey: "recordScreen") {
-        didSet { UserDefaults.standard.set(recordScreen, forKey: "recordScreen") }
+        didSet {
+            UserDefaults.standard.set(recordScreen, forKey: "recordScreen")
+            // Asked as it's switched on, not when the next call starts: the permission takes a
+            // relaunch, and mid-call that splits the recording in two.
+            if recordScreen, !ScreenRecorder.hasPermission {
+                UserDefaults.standard.set(true, forKey: "screenAccessRequested") // Settings offers the relaunch
+                CGRequestScreenCaptureAccess()
+            }
+        }
     }
 
     struct Session {
