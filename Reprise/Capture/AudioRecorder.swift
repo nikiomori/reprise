@@ -16,6 +16,9 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let control = NSLock()
     private var tapID = AudioObjectID.unknown
     private var deviceID = AudioObjectID.unknown
+    /// The one `connect()` picked, to tell when the default microphone changes.
+    private var microphone = AudioObjectID.unknown
+    private var followingMicrophone: AudioObjectPropertyListenerBlock?
     private var procID: AudioDeviceIOProcID?
     private var file: AVAudioFile?
     private var mix: AVAudioPCMBuffer?
@@ -71,7 +74,21 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         try control.withLock {
             do { try connect() } catch { file = nil; throw error }
         }
+        // A headset plugged in or a mic picked in Sound settings mid-call: the call app moves to it, so
+        // the recording does too. One that went away is the restart's job.
+        let follow: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self else { return }
+            control.withLock {
+                guard microphone != AudioObjectID.recordingMicrophone else { return }
+                try? reconnect()
+            }
+        }
+        var address = Self.defaultInput
+        AudioObjectAddPropertyListenerBlock(.system, &address, .global(qos: .userInitiated), follow)
+        followingMicrophone = follow
     }
+
+    private static let defaultInput = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
 
     /// Goes on into the same file with the microphone there is now: the old one went away, taking
     /// the clock of the Mac's sound with it, or changed its rate. The time without sound becomes
@@ -81,6 +98,11 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     }
 
     func stop() {
+        if let followingMicrophone { // outside the lock, which a change in flight waits for
+            var address = Self.defaultInput
+            AudioObjectRemovePropertyListenerBlock(.system, &address, .global(qos: .userInitiated), followingMicrophone)
+            self.followingMicrophone = nil
+        }
         control.withLock {
             disconnect()
             queue.sync {
@@ -97,8 +119,8 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     }
 
     private func connect() throws {
-        let mic = AudioObjectID.recordingMicrophone
-        let main = mic != .unknown ? mic : AudioObjectID.defaultOutputDevice
+        microphone = AudioObjectID.recordingMicrophone
+        let main = microphone != .unknown ? microphone : AudioObjectID.defaultOutputDevice
         guard let mainUID = main.string(kAudioDevicePropertyDeviceUID) else {
             throw CoreAudioError(action: "find an audio device", status: kAudioHardwareBadDeviceError)
         }
