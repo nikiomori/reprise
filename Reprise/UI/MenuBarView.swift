@@ -19,8 +19,10 @@ struct MenuBarView: View {
                 .padding(.bottom, 6)
 
             RecordRow(model: model)
-            Toggle("Record the Screen", isOn: $model.recordScreen)
+            // While recording, this recording's: whether it records the screen is set when it starts.
+            Toggle("Record the Screen", isOn: model.session.map { .constant($0.screen != nil) } ?? $model.recordScreen)
                 .toggleStyle(ChipToggleStyle(icon: "rectangle.inset.filled.badge.record"))
+                .disabled(model.session != nil)
             if model.session != nil, model.pillHidden {
                 Button(action: model.showPill) {
                     HStack(spacing: 10) {
@@ -183,6 +185,7 @@ private struct RecentRow: View {
 /// Menu-like rows: flat until hovered.
 private struct RowHighlightButtonStyle: ButtonStyle {
     @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled // a style of our own isn't dimmed by itself
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -190,8 +193,8 @@ private struct RowHighlightButtonStyle: ButtonStyle {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .contentShape(.rect)
-            .background(.quaternary.opacity(hovering ? 1 : 0), in: .rect(cornerRadius: 8))
-            .opacity(configuration.isPressed ? 0.6 : 1)
+            .background(.quaternary.opacity(hovering && isEnabled ? 1 : 0), in: .rect(cornerRadius: 8))
+            .opacity(configuration.isPressed ? 0.6 : isEnabled ? 1 : 0.5)
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.12), value: hovering)
     }
