@@ -5,26 +5,55 @@
 <h1 align="center">Reprise</h1>
 
 <p align="center"><b>Be present. Reprise remembers.</b><br>
-An open-source call recorder for macOS.</p>
+An open-source call recorder for macOS. It records calls, and nothing else.</p>
+
+<p align="center">
+  <a href="https://github.com/nikiomori/reprise/releases/latest"><b>Download</b></a> · macOS 26 or later · free, MIT
+</p>
 
 <p align="center">
   <img src="docs/media/island.gif" width="520" alt="Reprise finds a call, records it, and saves it">
 </p>
 
-Reprise records the two sides of a call: your voice and the voices of the other persons. It can also record the screen. Reprise keeps all files on your Mac.
+## Why Reprise
 
-## What Reprise does
+Reprise is one tool for one job: recording calls. There is nothing else in it, and everything that is there serves that job. On a call you can listen instead of taking notes, and go back to any moment later. *Reprise* is the musical sign for "play it again".
 
-A *call app* is an app for audio or video calls, for example Google Meet, Zoom, FaceTime, Telegram, or Yandex Telemost.
+### One job, done as well as it can be
 
-- Reprise finds calls automatically. When a call app starts to use the microphone, Reprise shows a *prompt* at the top of the screen.
-- You select **Record**. Or you set Reprise to record all calls from an app automatically.
-- Optional: Reprise records from the first second of the call, also if you select **Record** later.
-- Reprise records your microphone and the audio of the Mac into one file.
-- During the recording, a small *pill* shows two dots and a timer. The top dot lights when you speak. The red dot lights when the other persons speak. Thus you can see that Reprise records the two sides. You can move the pill or hide it.
-- Reprise stops the recording when the call ends.
-- The library shows all recordings. You can play, search, share, and delete them.
-- Reprise can send a recording to a transcription service. This step is optional.
+A call recorder fails in two ways: you forgot to press Record, or an hour later the other side isn't in the file. Reprise is built against both.
+
+- **It doesn't miss a call.** It notices calls by itself and asks once, or records without asking for the apps you choose. It can keep a call from its first second, even if you press Record later. It keeps recording through a lost microphone or a new headset, and repairs a recording cut off by a crash.
+- **You see both sides.** While it records, the pill shows the two dots of the logo: one lights up when you speak, the red one when the others do.
+- **Plain files.** Each call is a folder of ordinary files on your Mac, ready for any player, editor or script. No account, no cloud, no virtual audio driver.
+
+### Optimized to the limit
+
+A call recorder runs for hours next to the call app, often on battery, so every percent of CPU and every megabyte counts. Measured on Release builds:
+
+| | CPU | Memory |
+|---|---|---|
+| Waiting for a call in the menu bar | 0.05% | 21 MB |
+| Recording a call, pill on screen | 1.5% | 24 MB |
+| Recording the screen too, with macOS's capture service | 5–8% | |
+
+- Between calls Reprise waits for Core Audio events instead of polling, with one safety check every 30 seconds.
+- The pill's dots are Core Animation layers, not views redrawn every frame. Before that, recording with the pill took 15–20% CPU.
+- The screen is HEVC at a fixed quality: 0.5–6 Mbit/s instead of the 9–47 that macOS's ready-made recorder writes, 6–16 times smaller files that look the same. A still screen costs almost nothing.
+- The call's sound goes into the movie without re-encoding, and the microphone is never opened twice.
+- The whole app is a 2.7 MB download with no third-party code: SwiftUI and Liquid Glass over Core Audio, ScreenCaptureKit and AVFoundation. Spotlight, Shortcuts, Siri, VoiceOver and Reduce Motion work as they do in Apple's apps.
+
+### Open for good
+
+MIT, no paid version, no account. A call recorder needs your trust, and trust is checked in the code.
+
+## What it does
+
+- Finds calls in Zoom, Google Meet, Microsoft Teams, FaceTime, Slack, Telegram, WhatsApp, [and more](Reprise/Capture/MeetingDetector.swift), in apps and in browsers, and asks **Record this call?** Each app can be set to **Ask**, **Always Record** or **Ignore**.
+- Records your microphone and the sound of the Mac into one file, and the screen if you want it.
+- Stops when the call ends.
+- Keeps every call in a library: play it, search titles and transcripts, share it, drag it into Mail or Finder.
+- Optionally sends a call to a transcription service you choose, including one running on your own Mac.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/library-dark.png">
@@ -32,229 +61,74 @@ A *call app* is an app for audio or video calls, for example Google Meet, Zoom, 
 </picture>
 
 <p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/menu-dark.png"><img src="docs/media/menu-light.png" width="300" alt="The Reprise menu in the menu bar"></picture>
-  &nbsp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/settings-apps-dark.png"><img src="docs/media/settings-apps-light.png" width="460" alt="Rules for each call app"></picture>
-</p>
-
-## Screenshots
-
-The prompt, the pill during a recording, and the result:
-
-<p align="center">
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-prompt-dark.png"><img src="docs/media/island-prompt-light.png" width="400" alt="The prompt: Record this call?"></picture><br>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-recording-dark.png"><img src="docs/media/island-recording-light.png" width="400" alt="The pill: two dots, a timer, and a stop button"></picture><br>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/island-saved-dark.png"><img src="docs/media/island-saved-light.png" width="400" alt="The recording is saved"></picture>
 </p>
 
-The first start and the transcription settings:
-
-<p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/welcome-dark.png"><img src="docs/media/welcome-light.png" width="360" alt="The welcome window with the permissions"></picture>
-  &nbsp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/settings-transcription-dark.png"><img src="docs/media/settings-transcription-light.png" width="400" alt="The transcription settings"></picture>
-</p>
-
-A video of the prompt and the pill: [docs/media/island.mp4](docs/media/island.mp4).
-
-## Requirements
-
-- macOS 26 or later. We built and tested Reprise on macOS 27.
-- Xcode 27, if you build Reprise from the source code. We did not test Xcode 26.
-
 ## Install
 
-1. Download the ZIP file from [Releases](https://github.com/nikiomori/reprise/releases/latest).
-2. Open the ZIP file.
-3. Move `Reprise.app` to the Applications folder.
-4. Open Reprise.
+Download the ZIP from [Releases](https://github.com/nikiomori/reprise/releases/latest), open it, and move `Reprise.app` to Applications. Reprise is signed with Developer ID and notarized by Apple. It updates itself: once a day it checks GitHub, and you can turn that off in **Settings > General**.
 
-Reprise has a Developer ID signature, and Apple notarized it. Thus macOS opens it without a warning.
+On first start, Reprise asks for the **Microphone** (your voice) and **System Audio Recording** (the others). **Screen Recording** is needed only to record the screen.
 
-## Update
+## Tips
 
-Reprise checks GitHub for a new version one time each day. When a new version is available, the Reprise menu shows **Update to Reprise** and the version number.
-
-1. Select **Update to Reprise**. Or open **Settings > General** and select **Install and Relaunch**.
-2. Reprise downloads the new version, examines its signature, and starts again.
-
-Reprise installs a new version only if it has the same Developer ID signature. Thus a build from the source code does not install updates. During a recording, Reprise does not install an update.
-
-To stop the automatic check, open **Settings > General**. Then clear **Check for updates automatically**.
-
-## Use Reprise
-
-### Record a call
-
-1. Start a call in a call app.
-2. Wait for the prompt at the top of the screen.
-3. To also record the screen, select the screen button.
-4. Select **Record**.
-
-The recording starts. The pill shows at the top of the screen.
-
-> **NOTE:** If you do not select a button, the prompt closes after 20 seconds.
-
-### Record from the first second
-
-Sometimes you select **Record** after the call starts. To keep the call from the start:
-
-1. Open **Settings > General**.
-2. Select **Record calls from the first second**.
-
-Now, when the prompt shows, Reprise already records the audio. The prompt shows **Record from the start?**
-
-- If you select **Record**, the recording starts at the first second of the call.
-- If you do not select **Record**, Reprise deletes this audio permanently. The audio does not go to the Trash.
-
-Reprise records the screen only after you select **Record**.
-
-### Stop a recording
-
-1. Put the pointer on the pill. The pill shows more controls.
-2. Select the stop button.
-
-If you end the call, Reprise stops the recording automatically.
-
-### Record without a call
-
-1. Click the Reprise icon in the menu bar.
-2. Select **Start Recording**.
-
-When the library window is open, you can also select **File > New Recording** (⌘N). To stop, select **File > Stop Recording** (⌘.).
-
-### Use Spotlight, Shortcuts, or Siri
-
-Reprise adds two actions to macOS: **Start Recording** and **Stop Recording**.
-
-- In Spotlight, type "Start Recording".
-- In the Shortcuts app, use the actions in your shortcuts.
-- Say "Start recording with Reprise" to Siri.
-
-To start a recording with a keyboard shortcut:
-
-1. Open the Shortcuts app.
-2. Make a shortcut with the **Start Recording** action.
-3. Open the shortcut details and select **Add Keyboard Shortcut**.
-
-If Reprise asks to record a call, **Start Recording** records this call.
-
-### Set a rule for a call app
-
-1. Open **Settings > Apps**.
-2. For each app, select **Ask**, **Always Record**, or **Ignore**.
-
-You can also right-click the prompt and select **Always Record** or **Ignore**.
-
-Reprise also finds other apps that use the microphone for more than 10 seconds. These apps show in **Settings > Apps** under **Other Apps**.
-
-### Move or hide the pill
-
-- To move the pill, drag it. Reprise keeps the new position.
-- To move the pill to the top center again, right-click it. Then select **Move Back to the Top**.
-- To hide the pill until the call ends, double-click it. Or right-click it and select **Hide Until the Call Ends**.
-- To show the pill again, click the Reprise icon in the menu bar. Then select **Show the Floating Pill**.
-- To hide the pill for all recordings, open **Settings > General**. Then clear **Show the floating pill while recording**.
-
-When the pill is hidden, the menu bar shows the time of the recording next to the Reprise icon.
-
-### Find a recording
-
-1. Click the Reprise icon in the menu bar.
-2. Select **Open Library**.
-
-The library shows the recordings by day. Use the search field to find a word in a title or in a transcript.
+- **From the first second.** Turn on **Settings > General > Record calls from the first second**. Reprise then records while it asks. If you don't press Record, that audio is deleted for good.
+- **Keyboard, Spotlight and Siri.** Use **Start Recording** and **Stop Recording** from Spotlight, Shortcuts or Siri. For a hotkey, add one to a shortcut in the Shortcuts app.
+- **The pill.** Drag it anywhere. Double-click it to hide it until the call ends, and the menu bar shows the time instead.
+- **Without a call.** Choose **Start Recording** in the menu bar, or press ⌘N in the library.
 
 ## Transcription
 
-Reprise does not convert speech to text on the Mac yet. It can send the audio to a transcription service that you select.
+Optional. Reprise sends the audio, in 10-minute parts, to any service with the OpenAI-compatible `POST /audio/transcriptions` endpoint. Set it up in **Settings > Transcription**. The API key stays in the Keychain.
 
-Reprise uses the OpenAI-compatible endpoint `POST /audio/transcriptions`. Many cloud services and local servers use this endpoint.
-
-| Service | Model | Approximate price for 1 hour |
+| Service | Model | About 1 hour |
 |---|---|---|
 | Groq | `whisper-large-v3-turbo` | $0.04 |
 | Mistral | `voxtral-mini-latest` | $0.18 |
 | OpenAI | `gpt-4o-transcribe` | $0.36 |
-| A local server on your Mac: [speaches](https://github.com/speaches-ai/speaches), WhisperKit, LocalAI, whisper.cpp | Your choice | Free |
+| A local server: [speaches](https://github.com/speaches-ai/speaches), WhisperKit, LocalAI, whisper.cpp | Your choice | Free |
 
-To connect a service:
-
-1. Open **Settings > Transcription**.
-2. Select a service.
-3. Enter your API key. A local server does not need an API key.
-4. Optional: select the language of your calls. **Automatic** lets the service detect it.
-5. Optional: select **Transcribe calls automatically**.
-
-Reprise divides long recordings into parts of 10 minutes. This keeps each part below the limits of the services. Reprise keeps the API key in the macOS Keychain.
-
-> **CAUTION:** A cloud service receives the audio of your call. To keep the audio on your Mac, use a local server.
-
-## Permissions
-
-| Permission | Why Reprise needs it |
-|---|---|
-| Microphone | To record your voice |
-| System audio recording | To record the voices of the other persons |
-| Screen recording | To record the screen. Reprise needs this permission only for this function. |
-
-> **NOTE:** macOS applies the Screen Recording permission only after the app starts again. After you give this permission, select **Relaunch**.
+A cloud service receives the audio of your call. To keep it on your Mac, use a local server.
 
 ## Files
 
-Reprise keeps each recording in a folder in `~/Movies/Reprise`:
+Each call is a folder in `~/Movies/Reprise`:
 
 ```
 2026-10-06 21.30.12 Google Meet/
-├── recording.json   the title, the app, the start time, and the duration
-├── audio.m4a        the audio of the call
+├── recording.json   title, app, start time, duration
+├── audio.m4a        the call
 ├── screen.mov       the screen, if you recorded it
-└── transcript.txt   the text, if you transcribed the recording
+└── transcript.txt   the text, if you transcribed it
 ```
 
-During a recording, Reprise writes the audio to `audio.aac`. This format stays usable if the Mac stops unexpectedly. When the recording stops, Reprise changes the file to `audio.m4a`. Reprise writes `screen.mov` in parts of 5 seconds, so an unexpected stop loses only the last seconds of the screen. If a recording stopped unexpectedly, Reprise repairs it at the next start.
+While Reprise records, the sound goes to a stream that survives a crash or a power loss, and the movie is written in 5-second parts. Reprise repairs a cut-off recording at the next start. A deleted call goes to the Trash.
 
-When you delete a recording, Reprise moves it to the Trash.
+## Build from source
 
-## Build from the source code
+You need Xcode 27. Clone the repository, open `Reprise.xcodeproj` and run it. The project is generated from `project.yml` by [XcodeGen](https://github.com/yonaskolb/XcodeGen), so run `xcodegen generate` after you change it. To run the tests: `xcodebuild -scheme Reprise test`.
 
-1. Clone the repository: `git clone https://github.com/nikiomori/reprise.git`.
-2. Open `Reprise.xcodeproj` in Xcode.
-3. Select **Product > Run**.
+A build is signed ad hoc, so macOS asks for the permissions again after each build. To keep them, sign with your team in `Config/Local.xcconfig`, which git ignores:
 
-[XcodeGen](https://github.com/yonaskolb/XcodeGen) makes the Xcode project from `project.yml`. If you change `project.yml`, run `xcodegen generate`.
+```
+DEVELOPMENT_TEAM = YOURTEAMID
+CODE_SIGN_IDENTITY = Apple Development
+```
 
-> **NOTE:** By default, the build has an ad-hoc signature. Then macOS asks for the permissions again after each build. To prevent this, sign the build with your team. Create the file `Config/Local.xcconfig` with this text:
->
-> ```
-> DEVELOPMENT_TEAM = YOURTEAMID
-> CODE_SIGN_IDENTITY = Apple Development
-> ```
+## How it works
 
-To run the tests, use `xcodebuild -scheme Reprise test`.
+- **Detection.** Core Audio tells Reprise when an app starts or stops audio, and Reprise looks at which apps hold the microphone.
+- **Audio.** A private aggregate device joins the microphone and a Core Audio process tap on one clock, so the two sides never drift apart. The tap can take only the call app's sound.
+- **Headphones.** Reprise never opens a Bluetooth headset's microphone itself, so it never pushes headphones into call mode.
 
-## How Reprise works
-
-- **Call detection.** Core Audio tells Reprise when an app starts or stops audio. Then Reprise finds the apps that use the microphone (`kAudioProcessPropertyIsRunningInput`). When no call occurs, Reprise does no work.
-- **Audio.** A private aggregate device connects the microphone and a Core Audio process tap. The tap captures the audio of all apps except Reprise. If you select **Record only the sound of the call app** in Settings, the tap captures only the processes of the call app, its helper processes included. The two sources use one clock, so they stay in sync. If the microphone goes away during a call, for example when the headphones disconnect, Reprise continues the recording with the microphone that macOS uses now. The time without audio becomes silence, so the screen recording stays in sync.
-- **Headphones.** When an app opens the microphone of Bluetooth headphones, macOS changes the headphones to their call mode: the sound becomes mono, and the volume changes. Reprise does not cause this change. If no app uses the headphone microphone, Reprise records the built-in microphone of the Mac. When the call app stops all audio, Reprise stops the recording immediately. Thus the headphones go back to their usual mode at the end of the call. If the call app plays audio but closes the microphone, for example during mute, Reprise continues the recording for 5 minutes (10 seconds for a browser).
-- **Screen.** ScreenCaptureKit captures the screen, and Reprise encodes it with HEVC at a fixed quality (`AVAssetWriter`). A screen that does not change uses almost no space. The movie gets no sound of its own: when the recording stops, Reprise adds the sound of `audio.m4a` to `screen.mov` without a new encoding. Thus Reprise does not capture the microphone and the Mac a second time.
-- **Interface.** Reprise uses SwiftUI and Liquid Glass. It has no third-party dependencies.
-
-[docs/PLAN.md](docs/PLAN.md) gives the full design, the research about transcription, and the roadmap.
-
-## The logo
-
-The logo is the musical repeat sign `:‖`. In music, this sign means "go back and play again". The two dots are the two voices of a call: the gray dot is you, and the red dot is the other person.
+The full design, research and roadmap are in [docs/PLAN.md](docs/PLAN.md).
 
 ## Legal
 
-> **WARNING:** In many countries, the law requires the consent of all persons before you record a call. Tell all persons on the call that you record it.
+> **WARNING:** In many countries, the law requires the consent of all persons before you record a call. Tell everyone on the call that you record it.
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
----
-
-<sub>This README uses ASD-STE100 Simplified Technical English.</sub>
