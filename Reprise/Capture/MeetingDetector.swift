@@ -225,7 +225,8 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         for process in running {
             let app = apps[process] ?? Self.app(of: process)
             found.updateValue(app, forKey: process)
-            guard let app else { continue }
+            // Ignored apps aren't calls: no prompt, and no ticks every second while Logic holds the mic all day.
+            guard let app, app.rule != .never else { continue }
             audible.insert(app)
             if process.get(kAudioProcessPropertyIsRunningInput, UInt32(0)) == 1 { microphone.insert(app) }
         }
