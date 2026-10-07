@@ -244,6 +244,13 @@ struct UpdaterTests {
         #expect(store.recordings.first { $0.id == "\(recording.id) copy" }?.folder == copy)
     }
 
+    /// Trashed while searching: the next match is selected, not the next call in the whole library.
+    @Test func trashingSelectsTheNextCallShown() {
+        #expect(AppModel.next(after: "b", in: ["a", "b", "d"]) == "d") // "c" is hidden by the search
+        #expect(AppModel.next(after: "d", in: ["a", "b", "d"]) == "b")
+        #expect(AppModel.next(after: "a", in: ["a"]) == nil)
+    }
+
     /// Shared and dragged out under its title, not as one "audio.m4a" after another.
     @Test func callFileIsNamedAfterTheTitle() throws {
         var recording = try store.create(app: nil, at: .now)

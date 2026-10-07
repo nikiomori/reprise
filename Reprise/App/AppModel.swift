@@ -392,14 +392,11 @@ enum IslandState: Equatable {
     /// Being recorded or saved: its files aren't done yet.
     func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id || saving.contains(recording.id) }
 
-    func delete(_ recording: Recording, undo: UndoManager?) {
+    /// `shown`: the library's list as it's shown, maybe searched.
+    func delete(_ recording: Recording, shown: [Recording], undo: UndoManager?) {
         guard !isLive(recording) else { return } // stop first; otherwise capture continues into the Trash
-        let index = store.recordings.firstIndex { $0.id == recording.id } ?? 0
         guard let trashed = store.delete(recording) else { return }
-        // The next call takes its place, as in Mail and Voice Memos.
-        if selection == recording.id {
-            selection = (store.recordings.dropFirst(index).first ?? store.recordings.last)?.id
-        }
+        if selection == recording.id { selection = Self.next(after: recording.id, in: shown.map(\.id)) }
         // Edit > Undo puts it back, as in Finder and Mail.
         undo?.registerUndo(withTarget: self) { model in
             guard (try? FileManager.default.moveItem(at: trashed, to: recording.folder)) != nil else { return }
@@ -407,6 +404,13 @@ enum IslandState: Equatable {
             model.selection = recording.id
         }
         undo?.setActionName("Move to Trash")
+    }
+
+    /// Selected once `id` is trashed: the call after it, or the one before when it was the last, as in
+    /// Mail and Voice Memos. While searching, the next match, not a call the search hides: ⌫ would trash that next.
+    static func next(after id: Recording.ID, in list: [Recording.ID]) -> Recording.ID? {
+        let rest = list.filter { $0 != id }
+        return rest.dropFirst(list.firstIndex(of: id) ?? 0).first ?? rest.last
     }
 
     func transcribe(_ recording: Recording) {

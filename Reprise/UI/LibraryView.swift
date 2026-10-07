@@ -10,6 +10,7 @@ struct LibraryView: View {
 
     var body: some View {
         let sections = self.sections
+        let shown = sections.flatMap(\.recordings)
         NavigationSplitView {
             List(selection: $model.selection) {
                 ForEach(sections, id: \.title) { section in
@@ -22,7 +23,7 @@ struct LibraryView: View {
                                         .disabled(model.isLive(recording)) // its file is still being written
                                     Button("Show in Finder") { model.store.revealInFinder(recording) }
                                     Divider()
-                                    Button("Move to Trash", role: .destructive) { model.delete(recording, undo: undoManager) }
+                                    Button("Move to Trash", role: .destructive) { model.delete(recording, shown: shown, undo: undoManager) }
                                         .disabled(model.isLive(recording))
                                 }
                         }
@@ -33,7 +34,7 @@ struct LibraryView: View {
             .defaultFocus($listFocused, true) // not the title field, which would select itself
             .searchable(text: $search, placement: .sidebar, prompt: "Search calls")
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
-            .onDeleteCommand { if let selected { model.delete(selected, undo: undoManager) } }
+            .onDeleteCommand { if let selected { model.delete(selected, shown: shown, undo: undoManager) } }
             .overlay {
                 if !model.store.recordings.isEmpty, sections.isEmpty {
                     ContentUnavailableView.search(text: search)
@@ -41,7 +42,7 @@ struct LibraryView: View {
             }
         } detail: {
             if let selected {
-                RecordingDetail(recording: selected, model: model)
+                RecordingDetail(recording: selected, shown: shown, model: model)
                     .id("\(selected.id) \(selected.duration)") // duration is set when the file is finalized
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
             } else if model.store.recordings.isEmpty {
@@ -170,6 +171,7 @@ nonisolated struct CallFile: Transferable {
 
 private struct RecordingDetail: View {
     let recording: Recording
+    let shown: [Recording] // the library's list, to select the next call after Move to Trash
     let model: AppModel
     /// Made on appear, not in `init`: SwiftUI makes this view anew on every change around it
     /// (each letter typed into the search), and each would open the file in a new player.
@@ -210,7 +212,7 @@ private struct RecordingDetail: View {
                     .disabled(model.isLive(recording))
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
                 // No confirmation, like Finder: Edit > Undo puts it back.
-                Button("Move to Trash", systemImage: "trash") { model.delete(recording, undo: undoManager) }
+                Button("Move to Trash", systemImage: "trash") { model.delete(recording, shown: shown, undo: undoManager) }
                     .disabled(model.isLive(recording))
             }
         }
