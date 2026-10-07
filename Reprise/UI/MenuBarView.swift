@@ -47,7 +47,7 @@ struct MenuBarView: View {
             Button("Quit Reprise") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
-        .buttonStyle(.rowHighlight)
+        .buttonStyle(RowHighlightButtonStyle())
         .padding(5)
         .frame(width: 300)
     }
@@ -169,7 +169,7 @@ private struct RecentRow: View {
 }
 
 /// Menu-like rows: flat until hovered.
-struct RowHighlightButtonStyle: ButtonStyle {
+private struct RowHighlightButtonStyle: ButtonStyle {
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -183,8 +183,4 @@ struct RowHighlightButtonStyle: ButtonStyle {
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.12), value: hovering)
     }
-}
-
-extension ButtonStyle where Self == RowHighlightButtonStyle {
-    static var rowHighlight: RowHighlightButtonStyle { .init() }
 }

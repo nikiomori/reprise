@@ -26,7 +26,6 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private var micChannels = 0
     /// Host time right after the last sound in the file.
     private var end: UInt64?
-    private let peak = Mutex<Float>(0)
     private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
     private let heardThem = Mutex(false)
@@ -64,9 +63,6 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
         ]
     }
-
-    /// Peak level (0...1) since the last read; read it from the UI at frame rate.
-    func readLevel() -> Float { peak.withLock { level in defer { level = 0 }; return level } }
 
     /// Peak of each side (0...1) since the last read: the mic, and everyone else.
     func readVoices() -> (you: Float, them: Float) { voices.withLock { peaks in defer { peaks = (0, 0) }; return peaks } }
@@ -188,10 +184,8 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let (frames, you, them) = Self.mixDown(buffers, micChannels: micChannels, into: out, capacity: Int(mix.frameCapacity))
         guard frames > 0 else { return }
-        let loudest = (0..<frames).reduce(Float(0)) { max($0, abs(out[$1])) }
-        peak.withLock { $0 = max($0, loudest) }
         voices.withLock { $0 = (max($0.you, you), max($0.them, them)) }
-        if loudest > 0 { heard.withLock { $0 = true } }
+        if you > 0 || them > 0 { heard.withLock { $0 = true } }
         if them > 0 { heardThem.withLock { $0 = true } }
         mix.frameLength = AVAudioFrameCount(frames)
         // Sound lost to a stalled cycle or a microphone change comes back as silence, so the file

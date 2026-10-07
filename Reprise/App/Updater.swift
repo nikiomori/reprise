@@ -30,7 +30,7 @@ import Security
     private init() {
         Task {
             while true {
-                if UserDefaults.standard.bool(forKey: Self.autoKey, default: true) { await check(quietly: true) }
+                if UserDefaults.standard.bool(forKey: Self.autoKey) { await check(quietly: true) }
                 try? await Task.sleep(for: .seconds(24 * 60 * 60))
             }
         }
@@ -71,10 +71,6 @@ import Security
                 state = .failed(error.localizedDescription, release)
             }
         }
-    }
-
-    struct Failure: LocalizedError {
-        let errorDescription: String?
     }
 
     private nonisolated static func latest() async throws -> Release {

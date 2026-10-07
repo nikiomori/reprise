@@ -3,7 +3,7 @@ import Security
 
 /// Any service that speaks the OpenAI `POST /audio/transcriptions` dialect:
 /// OpenAI, Groq, Mistral, or a local whisper server (speaches, whisper.cpp, LocalAI…).
-nonisolated struct TranscriptionService: Equatable, Sendable {
+nonisolated struct TranscriptionService: Sendable {
     var baseURL: String
     var model: String
 
@@ -43,10 +43,6 @@ enum TranscriptionSettings {
 }
 
 nonisolated enum Transcriber {
-    struct Failure: LocalizedError {
-        let errorDescription: String?
-    }
-
     /// Long recordings are split into 10-minute pieces to stay under the
     /// 25 MB / duration limits most providers enforce.
     static func transcribe(

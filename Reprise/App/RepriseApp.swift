@@ -7,6 +7,7 @@ struct RepriseApp: App {
     @AppStorage("onboarded") private var onboarded = false
 
     init() {
+        UserDefaults.standard.register(defaults: ["showRecordingPill": true, Updater.autoKey: true])
         if isTesting {
             // The tests run inside the app: they get a scratch library, never the real one.
             setenv("REPRISE_ROOT", FileManager.default.temporaryDirectory.appending(path: "reprise-tests").path, 1)

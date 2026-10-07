@@ -466,10 +466,7 @@ private struct TranscriptSection: View {
 
             Group {
                 if let progress = model.transcribing[recording.id] {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Transcribing…").shimmering()
-                        ProgressView(value: progress).progressViewStyle(.linear)
-                    }
+                    ProgressView("Transcribing…", value: progress)
                 } else if let text = model.store.transcript(of: recording) {
                     Text(text)
                         .textSelection(.enabled)
@@ -501,26 +498,4 @@ private struct TranscriptSection: View {
             .animation(.smooth, value: model.transcribing[recording.id] == nil)
         }
     }
-}
-
-private struct Shimmer: ViewModifier {
-    @State private var phase: CGFloat = -1
-
-    func body(content: Content) -> some View {
-        content
-            .foregroundStyle(.secondary)
-            .overlay {
-                LinearGradient(colors: [.clear, .primary, .clear], startPoint: .leading, endPoint: .trailing)
-                    .scaleEffect(x: 0.6)
-                    .offset(x: phase * 160)
-                    .mask(content)
-            }
-            .onAppear {
-                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { phase = 1 }
-            }
-    }
-}
-
-extension View {
-    func shimmering() -> some View { modifier(Shimmer()) }
 }

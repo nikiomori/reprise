@@ -5,7 +5,7 @@ import AppKit
 /// `~/Movies/Reprise/<id>/{recording.json, audio.m4a, screen.mov, transcript.txt}`
 /// While recording, audio goes to `audio.aac` (ADTS), which stays playable even if the app is
 /// killed mid-call; it's repackaged into `audio.m4a` when the recording stops.
-struct Recording: Codable, Identifiable, Hashable {
+struct Recording: Codable, Identifiable, Equatable {
     let id: String // folder name, e.g. "2026-10-06 21.30.12 Zoom"
     var title: String
     var app: MeetingApp?

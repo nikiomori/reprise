@@ -27,8 +27,8 @@ nonisolated extension AudioObjectID {
         system.get(kAudioHardwarePropertyDefaultOutputDevice, unknown)
     }
 
-    func get<T: BitwiseCopyable>(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, _ fallback: T) -> T {
-        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+    func get<T: BitwiseCopyable>(_ selector: AudioObjectPropertySelector, _ fallback: T) -> T {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         var size = UInt32(MemoryLayout<T>.size)
         var value = fallback
         return AudioObjectGetPropertyData(self, &address, 0, nil, &size, &value) == noErr ? value : fallback

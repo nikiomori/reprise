@@ -33,11 +33,9 @@ targets:
     info:
       path: Reprise/Resources/Info.plist
       properties:
-        CFBundleDisplayName: Reprise
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
-        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         LSUIElement: true
         NSHumanReadableCopyright: MIT License
         NSMicrophoneUsageDescription: Reprise records your voice during the calls you choose to record.

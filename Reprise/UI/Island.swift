@@ -228,7 +228,7 @@ private struct ScreenToggle: View {
     }
 }
 
-/// Compact while you're on the call (two dots + timer); hover to see the level and the stop button.
+/// Compact while you're on the call (two dots + timer); hover to see the stop button.
 private struct RecordingContent: View {
     let model: AppModel
     @State private var expanded = false
@@ -242,8 +242,6 @@ private struct RecordingContent: View {
             ElapsedTime(since: model.session?.recording.startedAt ?? .now)
                 .font(.system(.body, design: .rounded).weight(.semibold))
             if expanded {
-                LevelMeter(level: model.level)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
                 Button {
                     Task { await model.stopRecording() }
                 } label: {
@@ -332,58 +330,17 @@ struct ElapsedTime: View {
     }
 }
 
-/// Five bars: the call's loudness over the last third of a second, newest on the right.
-struct LevelMeter: View {
-    let level: () -> Float
-    @State private var history = [Double](repeating: 0, count: 5)
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 15)) { context in
-            HStack(spacing: 2.5) {
-                ForEach(history.indices, id: \.self) { i in
-                    Capsule()
-                        .fill(.white.opacity(0.9))
-                        .frame(width: 3, height: 4 + 16 * history[i])
-                }
-            }
-            .frame(height: 20)
-            .onChange(of: context.date) { history = Array(history.dropFirst()) + [Self.normalize(level())] }
-        }
-    }
-
-    /// Rises fast, falls slowly, like a VU meter.
-    static func follow(_ current: Double, _ peak: Float) -> Double {
-        let target = normalize(peak)
-        return current + (target - current) * (target > current ? 0.6 : 0.12)
-    }
-
-    /// dBFS → 0...1 over a -50…0 dB window, which is where speech lives.
-    static func normalize(_ peak: Float) -> Double {
-        guard peak > 0 else { return 0 }
-        return min(1, max(0, (20 * log10(Double(peak)) + 50) / 50))
-    }
-}
-
 /// The logo's two dots, alive: the top one is you, the red one is everyone else.
 /// Each lights up when its side speaks, so a glance shows that both sides are recorded.
-struct VoiceDots: View {
-    let levels: () -> (you: Float, them: Float)
-
-    var body: some View {
-        DotLayers(levels: levels)
-            .frame(width: 7, height: 18)
-            .accessibilityElement()
-            .accessibilityLabel("Recording you and the other people")
-    }
-}
-
+///
 /// Core Animation layers on a 15 Hz timer. As a SwiftUI timeline, every tick laid out and
 /// redrew the whole island: 6% CPU for the whole call. Changing a layer's opacity costs nothing.
-private struct DotLayers: NSViewRepresentable {
+struct VoiceDots: NSViewRepresentable {
     let levels: () -> (you: Float, them: Float)
 
     func makeNSView(context: Context) -> DotsView { DotsView(levels: levels) }
     func updateNSView(_ view: DotsView, context: Context) { view.levels = levels }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DotsView, context: Context) -> CGSize? { CGSize(width: 7, height: 18) }
 
     final class DotsView: NSView {
         var levels: () -> (you: Float, them: Float)
@@ -395,6 +352,9 @@ private struct DotLayers: NSViewRepresentable {
             self.levels = levels
             super.init(frame: CGRect(x: 0, y: 0, width: 7, height: 18))
             wantsLayer = true
+            setAccessibilityElement(true)
+            setAccessibilityRole(.image)
+            setAccessibilityLabel("Recording you and the other people")
             for (dot, (color, y)) in zip(dots, [(NSColor.white, 11.0), (.systemRed, 0)]) {
                 dot.frame = CGRect(x: 0, y: y, width: 7, height: 7)
                 dot.cornerRadius = 3.5
@@ -424,7 +384,7 @@ private struct DotLayers: NSViewRepresentable {
 
         private func show() {
             let peaks = levels()
-            shown = [LevelMeter.follow(shown[0], peaks.you), LevelMeter.follow(shown[1], peaks.them)]
+            shown = [Self.follow(shown[0], peaks.you), Self.follow(shown[1], peaks.them)]
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             for (dot, level) in zip(dots, shown) {
@@ -434,6 +394,12 @@ private struct DotLayers: NSViewRepresentable {
                 dot.setAffineTransform(CGAffineTransform(scaleX: 1 + 0.25 * level, y: 1 + 0.25 * level))
             }
             CATransaction.commit()
+        }
+
+        /// Rises fast, falls slowly, like a VU meter, over a -50…0 dBFS window, where speech lives.
+        private static func follow(_ current: Double, _ peak: Float) -> Double {
+            let target = peak > 0 ? min(1, max(0, (20 * log10(Double(peak)) + 50) / 50)) : 0
+            return current + (target - current) * (target > current ? 0.6 : 0.12)
         }
     }
 }

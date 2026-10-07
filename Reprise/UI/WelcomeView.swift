@@ -104,7 +104,11 @@ private struct Step: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            StepIcon(icon: icon, tint: tint)
+            // A tinted symbol, the way Apple's own Mac apps list what they need on first launch.
+            Image(systemName: icon)
+                .font(.system(size: 22))
+                .foregroundStyle(tint)
+                .frame(width: 32)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).fontWeight(.medium)
                 Text(detail).font(.callout).foregroundStyle(.secondary)
@@ -127,19 +131,6 @@ private struct Step: View {
         .padding(.vertical, 8)
         .animation(.spring(duration: 0.4, bounce: 0.35), value: done)
         .animation(.smooth, value: actionTitle)
-    }
-}
-
-/// A tinted symbol, the way Apple's own Mac apps list what they need on first launch.
-private struct StepIcon: View {
-    let icon: String
-    let tint: Color
-
-    var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: 22))
-            .foregroundStyle(tint)
-            .frame(width: 32)
     }
 }
 
@@ -194,7 +185,6 @@ private struct Demo: View {
                     HStack(spacing: 8) {
                         VoiceDots { (.random(in: 0...0.3), .random(in: 0.1...0.6)) }
                         Text("0:12").font(.callout.weight(.semibold)).monospacedDigit()
-                        LevelMeter { Float.random(in: 0.05...0.6) }.scaleEffect(0.8)
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 34)

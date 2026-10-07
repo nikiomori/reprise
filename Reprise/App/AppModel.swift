@@ -132,7 +132,7 @@ enum IslandState: Equatable {
             session = Session(recording: recording, audio: audio, screen: screen)
             log.notice("Recording started: \(recording.id, privacy: .public), screen: \(screen != nil)")
             store.save(recording) // visible in the library right away, even if Reprise quits mid-call
-            pillHidden = !UserDefaults.standard.bool(forKey: "showRecordingPill", default: true)
+            pillHidden = !UserDefaults.standard.bool(forKey: "showRecordingPill")
             pillHidden ? show(.recording, for: .seconds(2)) : show(.recording)
             if let screenProblem { show(.problem(screenProblem), for: .seconds(8)) }
             Task { await watch(recording.id, audio) }
@@ -305,14 +305,6 @@ enum IslandState: Equatable {
     func debugShow(_ state: IslandState) { island = state }
     #endif
 
-    /// Current input level for the live meter, 0...1.
-    func level() -> Float {
-        #if DEBUG
-        if session == nil, DebugSnapshots.isRunning { return .random(in: 0.02...0.45) }
-        #endif
-        return session?.audio.readLevel() ?? 0
-    }
-
     /// Each side's level for the pill's two dots, 0...1.
     func voices() -> (you: Float, them: Float) {
         #if DEBUG
@@ -372,8 +364,7 @@ enum IslandState: Equatable {
     }
 }
 
-extension UserDefaults {
-    func bool(forKey key: String, default fallback: Bool) -> Bool {
-        object(forKey: key) == nil ? fallback : bool(forKey: key)
-    }
+/// An error that is only its message.
+nonisolated struct Failure: LocalizedError {
+    let errorDescription: String?
 }
