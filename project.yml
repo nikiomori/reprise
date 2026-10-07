@@ -1,0 +1,61 @@
+name: Reprise
+options:
+  bundleIdPrefix: dev.nikiomori
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  # XcodeGen doesn't know Icon Composer files yet; tell Xcode to compile it with actool.
+  postGenCommand: sed -i '' 's/lastKnownFileType = wrapper.icon/lastKnownFileType = folder.iconcomposer.icon/' Reprise.xcodeproj/project.pbxproj
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+targets:
+  Reprise:
+    type: application
+    platform: macOS
+    sources:
+      - path: Reprise
+    info:
+      path: Reprise/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Reprise
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        NSHumanReadableCopyright: MIT License
+        NSMicrophoneUsageDescription: Reprise records your voice during the calls you choose to record.
+        NSAudioCaptureUsageDescription: Reprise records what the other people on the call say.
+    entitlements:
+      path: Reprise/Resources/Reprise.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.nikiomori.reprise
+        PRODUCT_NAME: Reprise
+    scheme:
+      testTargets: [RepriseTests]
+  RepriseTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [RepriseTests]
+    dependencies:
+      - target: Reprise
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Reprise.app/Contents/MacOS/Reprise

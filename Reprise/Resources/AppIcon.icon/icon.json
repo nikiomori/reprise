@@ -1,0 +1,57 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "display-p3:1.00000,1.00000,1.00000,1.00000",
+      "display-p3:0.86000,0.86000,0.90000,1.00000"
+    ]
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "them.svg",
+          "name": "them",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.6
+      },
+      "specular": true
+    },
+    {
+      "layers": [
+        {
+          "image-name": "bars.svg",
+          "name": "bars",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "display-p3:0.95000,0.95000,0.97000,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "display-p3:0.95000,0.95000,0.97000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.35
+      },
+      "specular": true
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

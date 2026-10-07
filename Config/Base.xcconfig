@@ -1,0 +1,10 @@
+// Code signing. Contributors get an ad-hoc signature by default.
+// To sign with your own team (keeps privacy permissions across rebuilds),
+// create Config/Local.xcconfig (git-ignored) with:
+//   DEVELOPMENT_TEAM = YOURTEAMID
+//   CODE_SIGN_IDENTITY = Apple Development
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

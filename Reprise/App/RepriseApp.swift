@@ -1,0 +1,139 @@
+import AVFoundation
+import SwiftUI
+
+@main
+struct RepriseApp: App {
+    @NSApplicationDelegateAdaptor private var delegate: AppDelegate
+    @AppStorage("onboarded") private var onboarded = false
+
+    var body: some Scene {
+        MenuBarExtra {
+            MenuBarView(model: .shared)
+        } label: {
+            MenuBarIcon(model: .shared)
+        }
+        .menuBarExtraStyle(.window)
+
+        Window("Reprise", id: "library") {
+            LibraryView(model: .shared)
+                .showsInDock()
+        }
+        .defaultSize(width: 980, height: 640)
+        .windowToolbarStyle(.unified)
+
+        Window("Welcome to Reprise", id: "welcome") {
+            WelcomeView()
+                .showsInDock()
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+        .defaultLaunchBehavior(onboarded ? .suppressed : .presented)
+
+        Settings {
+            SettingsView()
+                .showsInDock()
+        }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var island: IslandPanel?
+    private let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = AppModel.shared
+        island = IslandPanel()
+        log.notice("Launched. Microphone: \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue), screen: \(CGPreflightScreenCaptureAccess())")
+        // `kill` and friends go through the normal quit, so a recording in progress gets saved.
+        signal(SIGTERM, SIG_IGN)
+        termination.setEventHandler { NSApp.terminate(nil) }
+        termination.resume()
+        #if DEBUG
+        DebugSnapshots.runIfRequested()
+        #endif
+    }
+
+    /// Never lose a call: finish writing the file before quitting.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let model = AppModel.shared
+        guard model.session != nil || model.stopping != nil else { return .terminateNow }
+        Task {
+            await model.stopRecording()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+}
+
+/// Lives in the menu bar for the app's whole life, so it also opens windows on behalf of
+/// AppKit code (the island panel isn't part of a SwiftUI scene and can't call `openWindow`).
+private struct MenuBarIcon: View {
+    let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Image(nsImage: .repriseGlyph(recording: model.session != nil))
+            .onReceive(NotificationCenter.default.publisher(for: .openRepriseWindow)) { note in
+                let id = note.object as? String ?? "library"
+                id == "settings" ? openSettings() : openWindow(id: id)
+                NSApp.activate()
+            }
+    }
+}
+
+extension Notification.Name {
+    /// Object: a window ID — "library", "welcome" or "settings".
+    static let openRepriseWindow = Notification.Name("openRepriseWindow")
+}
+
+extension NSImage {
+    /// The logo's repeat sign  :‖  sized for the menu bar. The lower dot — the other side of
+    /// the call — turns red while recording; otherwise it's a template the system tints.
+    static func repriseGlyph(recording: Bool) -> NSImage {
+        let image = NSImage(size: NSSize(width: 15, height: 16), flipped: true) { _ in
+            let ink = recording ? NSColor.labelColor : .black
+            ink.setFill()
+            NSBezierPath(ovalIn: NSRect(x: 0.5, y: 4, width: 3.4, height: 3.4)).fill()
+            NSBezierPath(roundedRect: NSRect(x: 5.6, y: 1, width: 1.6, height: 14), xRadius: 0.8, yRadius: 0.8).fill()
+            NSBezierPath(roundedRect: NSRect(x: 8.9, y: 1, width: 5.2, height: 14), xRadius: 1.4, yRadius: 1.4).fill()
+            (recording ? NSColor.systemRed : ink).setFill()
+            NSBezierPath(ovalIn: NSRect(x: 0.5, y: 8.6, width: 3.4, height: 3.4)).fill()
+            return true
+        }
+        image.isTemplate = !recording
+        image.accessibilityDescription = recording ? "Reprise — recording" : "Reprise"
+        return image
+    }
+}
+
+private struct ShowsInDock: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate()
+            }
+            .onDisappear {
+                // Back to a menu-bar-only app once the last window closes.
+                DispatchQueue.main.async {
+                    if !NSApp.windows.contains(where: { $0.isVisible && $0.styleMask.contains(.titled) }) {
+                        NSApp.setActivationPolicy(.accessory)
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    func showsInDock() -> some View { modifier(ShowsInDock()) }
+}
+
+/// Quits and opens a fresh copy — macOS only applies the Screen Recording permission to new launches.
+func relaunch() {
+    let reopen = Process()
+    reopen.executableURL = URL(filePath: "/bin/sh")
+    reopen.arguments = ["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$0\"", Bundle.main.bundlePath, "\(getpid())"]
+    try? reopen.run()
+    NSApp.terminate(nil)
+}

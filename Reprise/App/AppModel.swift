@@ -1,0 +1,234 @@
+import AVFoundation
+import OSLog
+import SwiftUI
+
+let log = Logger(subsystem: "dev.nikiomori.reprise", category: "app")
+
+/// What the floating island at the top of the screen is showing.
+enum IslandState: Equatable {
+    case hidden
+    case prompt(MeetingApp)
+    case recording
+    case saved(Recording)
+    case problem(String)
+}
+
+/// The app's brain: listens for calls, runs recordings, owns the library.
+@Observable final class AppModel {
+    static let shared = AppModel()
+
+    let store = RecordingStore()
+    let detector = MeetingDetector()
+    private(set) var island = IslandState.hidden
+    private(set) var session: Session?
+    /// The floating pill is tucked away for the rest of this recording.
+    private(set) var pillHidden = false
+    private(set) var transcribing: [Recording.ID: Double] = [:]
+    private(set) var transcriptionErrors: [Recording.ID: String] = [:]
+    var selection: Recording.ID?
+
+    var recordScreen = UserDefaults.standard.bool(forKey: "recordScreen") {
+        didSet { UserDefaults.standard.set(recordScreen, forKey: "recordScreen") }
+    }
+
+    struct Session {
+        var recording: Recording
+        let audio: AudioRecorder
+        let screen: ScreenRecorder?
+    }
+
+    private init() {
+        detector.onStart = { [unowned self] app in callStarted(app) }
+        detector.onEnd = { [unowned self] app in callEnded(app) }
+        detector.start()
+        // Finish recordings that were cut short last time (crash, force quit, power loss).
+        Task {
+            for recording in store.recordings where FileManager.default.fileExists(atPath: recording.partialAudioURL.path) {
+                await store.finalize(recording)
+            }
+        }
+    }
+
+    // MARK: Calls
+
+    private func callStarted(_ app: MeetingApp) {
+        log.notice("Call started in \(app.id, privacy: .public), rule: \(app.rule.rawValue, privacy: .public)")
+        guard session == nil else { return }
+        switch app.rule {
+        case .always: Task { await startRecording(app: app) }
+        case .ask: show(.prompt(app), for: .seconds(20))
+        case .never: break
+        }
+    }
+
+    private func callEnded(_ app: MeetingApp) {
+        log.notice("Call ended in \(app.id, privacy: .public)")
+        if session?.recording.app == app {
+            Task { await stopRecording() }
+        } else if island == .prompt(app) {
+            show(.hidden)
+        }
+    }
+
+    // MARK: Recording
+
+    @ObservationIgnored private var starting = false
+
+    func startRecording(app: MeetingApp?) async {
+        guard session == nil, !starting else { return } // a double-click must not start two recorders
+        starting = true
+        defer { starting = false }
+        guard await AVCaptureDevice.requestAccess(for: .audio) else {
+            return show(.problem("Reprise needs microphone access"), for: .seconds(6))
+        }
+        do {
+            var recording = try store.create(app: app, at: .now)
+            let audio = AudioRecorder(url: recording.partialAudioURL)
+            // Off the main thread: the first start blocks while macOS shows its permission prompt.
+            try await Task.detached { try audio.start() }.value
+
+            var screen: ScreenRecorder?
+            if recordScreen {
+                if ScreenRecorder.hasPermission {
+                    let recorder = ScreenRecorder()
+                    do {
+                        try await recorder.start(url: recording.videoURL)
+                        screen = recorder
+                        recording.hasVideo = true
+                    } catch {
+                        // Keep the audio going; a call is more important than its picture.
+                    }
+                } else {
+                    CGRequestScreenCaptureAccess()
+                }
+            }
+            session = Session(recording: recording, audio: audio, screen: screen)
+            log.notice("Recording started: \(recording.id, privacy: .public), screen: \(screen != nil)")
+            store.save(recording) // visible in the library right away, even if Reprise quits mid-call
+            pillHidden = !UserDefaults.standard.bool(forKey: "showRecordingPill", default: true)
+            pillHidden ? show(.recording, for: .seconds(2)) : show(.recording)
+            Task {
+                try? await Task.sleep(for: .seconds(5))
+                if session?.recording.id == recording.id, !audio.hasHeardSound {
+                    show(.problem("No sound is coming in. Check Privacy & Security."), for: .seconds(8))
+                }
+            }
+            if let app, !detector.active.contains(app) { await stopRecording() } // the call ended while starting
+        } catch {
+            log.error("Recording failed to start: \(error.localizedDescription, privacy: .public)")
+            show(.problem(error.localizedDescription), for: .seconds(6))
+        }
+    }
+
+    /// The stop in progress, so quitting can wait until the files are written.
+    @ObservationIgnored private(set) var stopping: Task<Void, Never>?
+
+    func stopRecording() async {
+        guard let session else {
+            await stopping?.value
+            return
+        }
+        self.session = nil
+        let task = Task { await finish(session) }
+        stopping = task
+        await task.value
+        if stopping == task { stopping = nil }
+    }
+
+    private func finish(_ session: Session) async {
+        session.audio.stop()
+        await session.screen?.stop()
+        var recording = session.recording
+        recording.duration = Date.now.timeIntervalSince(recording.startedAt)
+        recording = await store.finalize(recording)
+        log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
+        show(.saved(recording), for: .seconds(5))
+        if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey), TranscriptionSettings.service != nil {
+            transcribe(recording)
+        }
+    }
+
+    func toggleRecording() {
+        Task { session == nil ? await startRecording(app: nil) : await stopRecording() }
+    }
+
+    func dismissPrompt() { show(.hidden) }
+
+    func hidePill() {
+        pillHidden = true
+        show(.hidden)
+    }
+
+    func showPill() {
+        pillHidden = false
+        if session != nil { show(.recording) }
+    }
+
+    #if DEBUG
+    func debugShow(_ state: IslandState) { island = state }
+    #endif
+
+    /// Current input level for the live meter, 0...1.
+    func level() -> Float {
+        #if DEBUG
+        if session == nil, DebugSnapshots.isRunning { return .random(in: 0.02...0.45) }
+        #endif
+        return session?.audio.readLevel() ?? 0
+    }
+
+    // MARK: Island
+
+    @ObservationIgnored private var islandTimeout: Task<Void, Never>?
+
+    private func show(_ state: IslandState, for duration: Duration? = nil) {
+        islandTimeout?.cancel()
+        island = state
+        guard let duration else { return }
+        islandTimeout = Task {
+            try? await Task.sleep(for: duration)
+            if !Task.isCancelled { island = session == nil || pillHidden ? .hidden : .recording }
+        }
+    }
+
+    // MARK: Library
+
+    func rename(_ recording: Recording, to title: String) {
+        var recording = recording
+        recording.title = title
+        store.save(recording)
+        if session?.recording.id == recording.id { session?.recording.title = title }
+    }
+
+    func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id }
+
+    func delete(_ recording: Recording) {
+        guard !isLive(recording) else { return } // stop first; otherwise capture continues into the Trash
+        store.delete(recording)
+    }
+
+    func transcribe(_ recording: Recording) {
+        guard !isLive(recording), transcribing[recording.id] == nil, let service = TranscriptionSettings.service else { return }
+        transcribing[recording.id] = 0
+        transcriptionErrors[recording.id] = nil
+        let apiKey = TranscriptionSettings.apiKey
+        let language = UserDefaults.standard.string(forKey: TranscriptionSettings.languageKey)
+        Task {
+            do {
+                let text = try await Transcriber.transcribe(recording.audioURL, service: service, apiKey: apiKey, language: language) { value in
+                    await MainActor.run { self.transcribing[recording.id] = value }
+                }
+                try text.write(to: recording.transcriptURL, atomically: true, encoding: .utf8)
+            } catch {
+                transcriptionErrors[recording.id] = error.localizedDescription
+            }
+            transcribing[recording.id] = nil
+            store.save(store.recordings.first { $0.id == recording.id } ?? recording) // nudge observers
+        }
+    }
+}
+
+extension UserDefaults {
+    func bool(forKey key: String, default fallback: Bool) -> Bool {
+        object(forKey: key) == nil ? fallback : bool(forKey: key)
+    }
+}
