@@ -85,7 +85,11 @@ enum IslandState: Equatable {
     private func callEnded(_ app: MeetingApp) {
         log.notice("Call ended in \(app.id, privacy: .public)")
         if session?.recording.app == app {
-            Task { await stopRecording() }
+            Task { // after this tick, so a call that ended in it too isn't offered
+                stop()
+                // A call joined while this one was recorded got no prompt then: it gets one now.
+                if let next = detector.active.first { callStarted(next) }
+            }
         } else if island == .prompt(app) {
             show(.hidden)
         }
@@ -264,15 +268,17 @@ enum IslandState: Equatable {
     @ObservationIgnored private(set) var stopping: Task<Void, Never>?
 
     func stopRecording() async {
-        guard let session else {
-            await stopping?.value
-            return
-        }
-        self.session = nil
-        let task = Task { await finish(session) }
-        stopping = task
-        await task.value
+        stop()
+        let task = stopping
+        await task?.value
         if stopping == task { stopping = nil }
+    }
+
+    /// Stops at once; the files are finished in `stopping`.
+    private func stop() {
+        guard let session else { return }
+        self.session = nil
+        stopping = Task { await finish(session) }
     }
 
     private func finish(_ session: Session) async {

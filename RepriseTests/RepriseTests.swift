@@ -124,6 +124,17 @@ struct MixDownTests {
         #expect(events(call + reconnected, wakingAt: 2) == ["start Zoom", "start Zoom"])
     }
 
+    /// A call joined while another was recorded is still going on as that one ends, so it can be offered then.
+    @Test func callJoinedDuringAnotherIsOnWhenThatEnds() {
+        let detector = MeetingDetector()
+        var goingOn: Set<MeetingApp>?
+        detector.onEnd = { _ in goingOn = detector.active }
+        let start = Date.now
+        let steps: [(after: TimeInterval, microphone: Set<MeetingApp>)] = [(0, [zoom]), (2, [zoom]), (60, [zoom, chrome]), (62, [zoom, chrome]), (100, [chrome])]
+        for step in steps { detector.update(now: start + step.after, microphone: step.microphone, audible: step.microphone) }
+        #expect(goingOn == [chrome])
+    }
+
     @Test func browserEndsSoonAfterTheMicCloses() {
         #expect(events([
             (0, [chrome], [chrome]),
