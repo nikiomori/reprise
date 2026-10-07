@@ -233,6 +233,18 @@ struct UpdaterTests {
         #expect(store.recordings.first { $0.id == "\(recording.id) copy" }?.folder == copy)
     }
 
+    /// Shared and dragged out under its title, not as one "audio.m4a" after another.
+    @Test func callFileIsNamedAfterTheTitle() throws {
+        var recording = try store.create(app: nil, at: .now)
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        recording.title = "Q3/Q4 review"
+        try Data("sound".utf8).write(to: recording.finalAudioURL)
+        let copy = try CallFile(recording).named()
+        defer { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }
+        #expect(copy.lastPathComponent == "Q3-Q4 review.m4a")
+        #expect(FileManager.default.contentsEqual(atPath: copy.path, andPath: recording.finalAudioURL.path))
+    }
+
     /// Two seconds of sound in the crash-safe stream and a second of movie without sound, as a recording leaves them.
     private func screenRecording(movieStart: TimeInterval?) async throws -> Recording {
         var recording = try store.create(app: nil, at: .now)

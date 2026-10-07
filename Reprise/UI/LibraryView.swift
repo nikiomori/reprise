@@ -18,7 +18,7 @@ struct LibraryView: View {
                             RecordingRow(recording: recording, isLive: model.session?.recording.id == recording.id)
                                 .tag(recording.id)
                                 .contextMenu {
-                                    ShareLink("Share…", item: recording.hasVideo ? recording.videoURL : recording.audioURL)
+                                    ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
                                     Button("Show in Finder") { model.store.revealInFinder(recording) }
                                     Divider()
                                     Button("Move to Trash", role: .destructive) { model.delete(recording, undo: undoManager) }
@@ -101,7 +101,7 @@ private struct RecordingRow: View {
 
     var body: some View {
         // Into Mail, Finder or another app, as from Finder; not while it's still being written.
-        if isLive { row } else { row.draggable(recording.hasVideo ? recording.videoURL : recording.audioURL) }
+        if isLive { row } else { row.draggable(CallFile(recording)) }
     }
 
     private var row: some View {
@@ -128,6 +128,33 @@ private struct RecordingRow: View {
             }
         }
         .padding(.vertical, 3)
+    }
+}
+
+/// A call's file under the call's title, for Share and dragging out: Mail and the Desktop get
+/// "Zoom call.m4a", not one "audio.m4a" after another. Still handed over as a file, as from
+/// Finder, not as a file promise (`FileRepresentation`), which not every app takes.
+nonisolated struct CallFile: Transferable {
+    let url: URL
+    let title: String
+
+    @MainActor init(_ recording: Recording) {
+        url = recording.hasVideo ? recording.videoURL : recording.audioURL
+        title = recording.title
+    }
+
+    static var transferRepresentation: some TransferRepresentation {
+        ProxyRepresentation { try $0.named() }
+    }
+
+    // ponytail: the copies stay in the temporary folder. Free while the call is kept; a trashed
+    // call's space comes back once macOS clears that folder. Delete them after the drop if that's too late.
+    /// A copy under the title, on the same disk so it's a clone: instant, and it takes no space.
+    func named() throws -> URL {
+        let folder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: url, create: true)
+        let copy = folder.appending(path: "\(title.replacingOccurrences(of: "/", with: "-")).\(url.pathExtension)") // a "/" would nest folders
+        try FileManager.default.copyItem(at: url, to: copy)
+        return copy
     }
 }
 
@@ -177,7 +204,7 @@ private struct RecordingDetail: View {
         .toolbar {
             ToolbarSpacer(.fixed) // this call's actions apart from Record, which isn't about it
             ToolbarItemGroup {
-                ShareLink(item: recording.hasVideo ? recording.videoURL : recording.audioURL)
+                ShareLink(item: CallFile(recording), preview: SharePreview(recording.title))
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
                 // No confirmation, like Finder: Edit > Undo puts it back.
                 Button("Move to Trash", systemImage: "trash") { model.delete(recording, undo: undoManager) }
