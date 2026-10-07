@@ -266,7 +266,7 @@ enum IslandState: Equatable {
         try? FileManager.default.removeItem(at: preroll.recording.folder)
     }
 
-    /// The stop in progress, so quitting can wait until the files are written.
+    /// The stops in progress, so quitting can wait until the files are written.
     @ObservationIgnored private(set) var stopping: Task<Void, Never>?
 
     func stopRecording() async {
@@ -281,7 +281,11 @@ enum IslandState: Equatable {
         guard let session else { return }
         self.session = nil
         saving.insert(session.recording.id)
-        stopping = Task { await finish(session) }
+        // Ends after the stops before it too: the call that ended a moment ago may still be saving.
+        stopping = Task { [previous = stopping] in
+            await finish(session)
+            await previous?.value
+        }
     }
 
     private func finish(_ session: Session) async {
