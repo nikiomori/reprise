@@ -7,6 +7,7 @@ struct LibraryView: View {
     @FocusState private var listFocused: Bool
 
     var body: some View {
+        let sections = self.sections
         NavigationSplitView {
             List(selection: $model.selection) {
                 ForEach(sections, id: \.title) { section in
@@ -67,6 +68,9 @@ struct LibraryView: View {
             if model.selection == nil { model.selection = model.store.recordings.first?.id }
             DispatchQueue.main.async { listFocused = true } // arrows browse calls right away
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.store.reload() // calls removed or added in Finder meanwhile
+        }
     }
 
     private var selected: Recording? {
@@ -123,7 +127,9 @@ private struct RecordingRow: View {
 private struct RecordingDetail: View {
     let recording: Recording
     let model: AppModel
-    @State private var player: Player
+    /// Made on appear, not in `init`: SwiftUI makes this view anew on every change around it
+    /// (each letter typed into the search), and each would open the file in a new player.
+    @State private var player: Player?
     @State private var title: String
     @State private var renaming = false
     @FocusState private var titleFocused: Bool
@@ -131,7 +137,6 @@ private struct RecordingDetail: View {
     init(recording: Recording, model: AppModel) {
         self.recording = recording
         self.model = model
-        _player = State(initialValue: Player(url: recording.hasVideo ? recording.videoURL : recording.audioURL))
         _title = State(initialValue: recording.title)
     }
 
@@ -142,14 +147,16 @@ private struct RecordingDetail: View {
                 if model.isLive(recording) {
                     LiveCard(model: model, since: recording.startedAt)
                 } else {
-                    if recording.hasVideo {
-                        VideoPlayer(player: player.avPlayer)
-                            .aspectRatio(16 / 10, contentMode: .fit)
-                            .clipShape(.rect(cornerRadius: 16))
-                            .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+                    if let player {
+                        if recording.hasVideo {
+                            VideoPlayer(player: player.avPlayer)
+                                .aspectRatio(16 / 10, contentMode: .fit)
+                                .clipShape(.rect(cornerRadius: 16))
+                                .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+                        }
+                        PlayerCard(player: player, waveformSource: recording.audioURL)
+                            .tint(.primary)
                     }
-                    PlayerCard(player: player, waveformSource: recording.audioURL)
-                        .tint(.primary)
                     TranscriptSection(recording: recording, model: model)
                 }
             }
@@ -167,7 +174,12 @@ private struct RecordingDetail: View {
                     .disabled(model.isLive(recording))
             }
         }
-        .onDisappear { player.avPlayer.pause() }
+        .onAppear {
+            if player == nil, !model.isLive(recording) {
+                player = Player(url: recording.hasVideo ? recording.videoURL : recording.audioURL)
+            }
+        }
+        .onDisappear { player?.avPlayer.pause() }
     }
 
     private func saveTitle() {
@@ -241,19 +253,24 @@ private struct LiveCard: View {
             if isPlaying { avPlayer.rate = rate }
         }
     }
-    @ObservationIgnored private var observers: [Any] = []
+    @ObservationIgnored private var observer: Any?
 
     init(url: URL) {
         avPlayer = AVPlayer(url: url)
         // Also called when playback starts or stops — at the end, or from the video's own controls.
-        observers.append(avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] time in
+        observer = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] time in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.time = time.seconds
                 if self.isPlaying != (self.avPlayer.rate != 0) { self.isPlaying.toggle() }
             }
-        })
+        }
         Task { duration = (try? await avPlayer.currentItem?.asset.load(.duration).seconds) ?? 0 }
+    }
+
+    /// AVPlayer: an observer released without being removed is undefined behavior.
+    isolated deinit {
+        if let observer { avPlayer.removeTimeObserver(observer) }
     }
 
     func toggle() {

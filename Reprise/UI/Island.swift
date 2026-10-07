@@ -199,14 +199,12 @@ private struct PromptContent: View {
 
 /// A solid capsule we draw ourselves: system bezels look dimmed in panels that aren't key.
 struct CapsuleButtonStyle: ButtonStyle {
-    var color: Color = .red
-    var padding = EdgeInsets(top: 7, leading: 14, bottom: 7, trailing: 14)
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(.white)
-            .padding(padding)
-            .background(color.gradient, in: .capsule)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 14)
+            .background(Color.red.gradient, in: .capsule)
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .brightness(configuration.isPressed ? -0.08 : 0)
             .animation(.spring(duration: 0.25, bounce: 0.4), value: configuration.isPressed)

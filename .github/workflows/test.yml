@@ -1,0 +1,12 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      # The newest Xcode on the runner: Reprise needs Xcode 27.
+      - run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - run: xcodebuild -project Reprise.xcodeproj -scheme Reprise -destination 'platform=macOS,arch=arm64' test

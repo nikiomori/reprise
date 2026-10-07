@@ -12,12 +12,20 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let url: URL
     private let processes: [AudioObjectID]
     private let queue = DispatchQueue(label: "dev.nikiomori.reprise.audio", qos: .userInteractive)
+    /// Start, restart and stop take turns: a restart may still be at work when the recording stops.
+    private let control = NSLock()
     private var tapID = AudioObjectID.unknown
     private var deviceID = AudioObjectID.unknown
     private var procID: AudioDeviceIOProcID?
     private var file: AVAudioFile?
     private var mix: AVAudioPCMBuffer?
+    /// Brings a microphone's sound to the file's rate, when it runs at another one.
+    private var converter: AVAudioConverter?
+    private var resampled: AVAudioPCMBuffer?
+    private var rate: Double = 0
     private var micChannels = 0
+    /// Host time right after the last sound in the file.
+    private var end: UInt64?
     private let peak = Mutex<Float>(0)
     private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
@@ -64,6 +72,35 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     func readVoices() -> (you: Float, them: Float) { voices.withLock { peaks in defer { peaks = (0, 0) }; return peaks } }
 
     func start() throws {
+        try control.withLock {
+            do { try connect() } catch { file = nil; throw error }
+        }
+    }
+
+    /// Goes on into the same file with the microphone there is now: the old one went away, taking
+    /// the clock of the Mac's sound with it, or changed its rate. The time without sound becomes
+    /// silence, so the screen recording stays in sync.
+    func restart() throws {
+        try control.withLock { try reconnect() }
+    }
+
+    func stop() {
+        control.withLock {
+            disconnect()
+            queue.sync {
+                file?.close()
+                file = nil
+            }
+        }
+    }
+
+    private func reconnect() throws {
+        guard file != nil else { return } // stopped meanwhile
+        disconnect()
+        try connect()
+    }
+
+    private func connect() throws {
         let mic = AudioObjectID.recordingMicrophone
         let main = mic != .unknown ? mic : AudioObjectID.defaultOutputDevice
         guard let mainUID = main.string(kAudioDevicePropertyDeviceUID) else {
@@ -95,38 +132,53 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         do {
             try check("create the recording device", AudioHardwareCreateAggregateDevice(description as CFDictionary, &deviceID))
 
-            let rate = deviceID.get(kAudioDevicePropertyNominalSampleRate, Float64(48_000))
+            rate = deviceID.get(kAudioDevicePropertyNominalSampleRate, Float64(48_000))
             // An IO cycle every 40 ms instead of every 10: each one wakes Reprise up, and a
             // recording needs no low latency. Measured: a quarter less CPU while recording.
             let range = deviceID.get(kAudioDevicePropertyBufferFrameSizeRange, AudioValueRange())
             deviceID.set(kAudioDevicePropertyBufferFrameSize, UInt32(min(rate / 25, range.mMaximum)))
-            // The file's time zero lies before the first IO cycle: the drift-compensated tap hands over
-            // the Mac's sound late (2399 frames, 50 ms, on a MacBook), and then comes the encoder delay.
-            let tapLatency = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
-            lead = UInt64(Double(Int(tapLatency) + Self.encoderDelay) / rate * 1e9)
-            file = try AVAudioFile(forWriting: url, settings: Self.fileSettings(rate: rate), commonFormat: .pcmFormatFloat32, interleaved: false)
-            mix = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!, frameCapacity: 16_384)
+            if file == nil {
+                // The file's time zero lies before the first IO cycle: the drift-compensated tap hands over
+                // the Mac's sound late (2399 frames, 50 ms, on a MacBook), and then comes the encoder delay.
+                let tapLatency = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
+                lead = UInt64(Double(Int(tapLatency) + Self.encoderDelay) / rate * 1e9)
+                file = try AVAudioFile(forWriting: url, settings: Self.fileSettings(rate: rate), commonFormat: .pcmFormatFloat32, interleaved: false)
+            }
+            let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
+            let fileFormat = file!.processingFormat
+            mix = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 16_384)
+            converter = rate == fileFormat.sampleRate ? nil : AVAudioConverter(from: format, to: fileFormat)
+            resampled = converter == nil ? nil : AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(16_384 * fileFormat.sampleRate / rate) + 64)
 
             try check("start recording", AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, inputTime, _, _ in
                 self?.write(input, at: inputTime.pointee.mHostTime)
             })
             try check("start recording", AudioDeviceStart(deviceID, procID))
+            // A call app may switch the microphone to another rate mid-call. Written on at the old
+            // one, the sound would play too fast or too slow.
+            var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyNominalSampleRate, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            let device = deviceID
+            AudioObjectAddPropertyListenerBlock(device, &address, .global(qos: .userInitiated)) { [weak self] _, _ in
+                guard let self else { return }
+                control.withLock {
+                    guard device == deviceID, device.get(kAudioDevicePropertyNominalSampleRate, rate) != rate else { return }
+                    try? reconnect()
+                }
+            }
         } catch {
-            stop()
+            disconnect()
             throw error
         }
     }
 
-    func stop() {
+    /// Leaves the file open for `connect()` to go on with.
+    private func disconnect() {
         if let procID {
             AudioDeviceStop(deviceID, procID)
             AudioDeviceDestroyIOProcID(deviceID, procID)
             self.procID = nil
         }
-        queue.sync {
-            file?.close()
-            file = nil
-        }
+        queue.sync {} // the last IO cycle is done before its buffers change
         if deviceID != .unknown { AudioHardwareDestroyAggregateDevice(deviceID); deviceID = .unknown }
         if tapID != .unknown { AudioHardwareDestroyProcessTap(tapID); tapID = .unknown }
     }
@@ -142,9 +194,45 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         if loudest > 0 { heard.withLock { $0 = true } }
         if them > 0 { heardThem.withLock { $0 = true } }
         mix.frameLength = AVAudioFrameCount(frames)
-        guard (try? file.write(from: mix)) != nil else { return }
+        // Sound lost to a stalled cycle or a microphone change comes back as silence, so the file
+        // keeps to the clock and the screen recording stays in sync with it.
+        if let end, hostTime > end {
+            writeSilence(Double(AudioConvertHostTimeToNanos(hostTime - end)) / 1e9, to: file)
+        }
+        guard (try? append(mix, to: file)) != nil else { return }
+        end = hostTime + AudioConvertNanosToHostTime(UInt64(Double(frames) / rate * 1e9))
         started.withLock { $0 = $0 ?? hostTime }
         written.withLock { $0 += frames }
+    }
+
+    private func append(_ buffer: AVAudioPCMBuffer, to file: AVAudioFile) throws {
+        guard let converter, let resampled else { return try file.write(from: buffer) }
+        try Self.convert(buffer, with: converter, into: resampled)
+        try file.write(from: resampled)
+    }
+
+    /// One IO cycle through a converter that keeps its state for the next one.
+    static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter, into out: AVAudioPCMBuffer) throws {
+        nonisolated(unsafe) var given = false
+        var failure: NSError?
+        let status = converter.convert(to: out, error: &failure) { _, state in
+            defer { given = true }
+            state.pointee = given ? .noDataNow : .haveData
+            return given ? nil : buffer
+        }
+        guard status != .error else { throw failure ?? CocoaError(.fileWriteUnknown) }
+    }
+
+    /// Gaps under 10 ms are the clocks' jitter, not lost sound.
+    private func writeSilence(_ seconds: Double, to file: AVAudioFile) {
+        guard seconds > 0.01, let silence = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 48_000) else { return }
+        silence.floatChannelData![0].update(repeating: 0, count: Int(silence.frameCapacity))
+        var left = AVAudioFrameCount(seconds * file.processingFormat.sampleRate)
+        while left > 0 {
+            silence.frameLength = min(left, silence.frameCapacity)
+            guard (try? file.write(from: silence)) != nil else { return }
+            left -= silence.frameLength
+        }
     }
 
     /// Mixes one IO cycle of interleaved Float32 buffers down to mono: the average of the

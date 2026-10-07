@@ -6,8 +6,14 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     let name: String
 
     var icon: NSImage? {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map { NSWorkspace.shared.icon(forFile: $0.path) }
+        if let cached = Self.icons[id] { return cached }
+        let icon = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map { NSWorkspace.shared.icon(forFile: $0.path) }
+        Self.icons.updateValue(icon, forKey: id)
+        return icon
     }
+
+    /// Looked up once: list rows ask on every redraw, and each lookup goes to LaunchServices.
+    private static var icons: [String: NSImage?] = [:]
 
     var isInstalled: Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil }
 
@@ -115,9 +121,10 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
 
     // ponytail: two fixed values; per-app tuning if some app's calls end with a long tail.
     /// How long an app may keep playing sound with the mic closed before its call counts as over.
-    /// A call app doing that is muted (some close the mic on mute); a browser may just be
-    /// playing a video after the call, and Reprise holding the mic keeps headphones in call mode.
-    private func endGrace(_ app: MeetingApp) -> TimeInterval { app.isBrowser ? 10 : 60 }
+    /// A call app doing that is muted (some close the mic on mute), and a long mute mustn't cut the
+    /// recording in two. A browser may just be playing a video after the call, and Reprise holding
+    /// the mic keeps headphones in call mode.
+    private func endGrace(_ app: MeetingApp) -> TimeInterval { app.isBrowser ? 10 : 300 }
 
     /// Core Audio calls back when any app starts or stops audio, so between calls Reprise does no work.
     func start() {

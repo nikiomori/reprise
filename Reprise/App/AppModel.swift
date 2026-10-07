@@ -4,6 +4,9 @@ import SwiftUI
 
 let log = Logger(subsystem: "dev.nikiomori.reprise", category: "app")
 
+/// Unit tests run inside the app.
+let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
 /// What the floating island at the top of the screen is showing.
 enum IslandState: Equatable {
     case hidden
@@ -45,6 +48,7 @@ enum IslandState: Equatable {
     private init() {
         detector.onStart = { [unowned self] app in callStarted(app) }
         detector.onEnd = { [unowned self] app in callEnded(app) }
+        guard !isTesting else { return } // no calls and no repairs: the tests drive the pieces themselves
         detector.start()
         store.deleteUnanswered()
         // Finish recordings that were cut short last time (crash, force quit, power loss).
@@ -116,6 +120,7 @@ enum IslandState: Equatable {
                         screen = recorder
                         recording.hasVideo = true
                     } catch {
+                        try? FileManager.default.removeItem(at: recording.videoURL) // what the failed start left
                         screenProblem = "Recording without the screen: \(error.localizedDescription)"
                     }
                 } else {
@@ -138,14 +143,17 @@ enum IslandState: Equatable {
         }
     }
 
-    // ponytail: warns only; restart into a new segment if lost microphones turn out to be common.
-    /// Warns once whenever the recording stops getting sound: a missing permission, a
-    /// microphone that went away (it also carries the clock for the Mac's sound), a full disk.
+    // ponytail: notices a lost microphone within 10 s; listen to the device list if that's too late.
+    /// Keeps the sound coming: a recording that stopped getting it, usually because the microphone
+    /// went away (it also carries the clock for the Mac's sound), goes on with the one there is now.
+    /// Warns once when that doesn't help (a full disk) or no sound comes at all (a missing permission).
     private func watch(_ id: Recording.ID, _ audio: AudioRecorder) async {
         var written = -1
         var warned = false
-        while true {
-            try? await Task.sleep(for: .seconds(5))
+        var stalledBefore = false
+        for tick in 0... {
+            // The first look comes early: until the movie's start is saved, a crash leaves it without sound.
+            try? await Task.sleep(for: .seconds(tick == 0 ? 1 : 5))
             guard let session, session.recording.id == id else { return }
             // Saved once known, so a movie cut short by a crash still gets its sound.
             if session.recording.movieStart == nil, let start = Self.movieStart(in: session) {
@@ -153,11 +161,20 @@ enum IslandState: Equatable {
                 store.save(self.session!.recording)
             }
             let now = audio.framesWritten
-            let problem = !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
-                : now == written ? "The recording stopped getting sound. Check the microphone and the free disk space."
+            let stalled = tick > 0 && now == written
+            let problem = tick == 0 ? nil
+                : !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
+                : stalled && stalledBefore ? "The recording stopped getting sound. Check the microphone and the free disk space."
                 : nil
             if let problem, !warned { show(.problem(problem), for: .seconds(8)) }
             warned = problem != nil
+            if stalled {
+                log.notice("The recording stopped getting sound; restarting it on the current microphone")
+                do { try await Task.detached { try audio.restart() }.value } catch {
+                    log.error("Restart failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            stalledBefore = stalled
             written = now
         }
     }
@@ -248,7 +265,10 @@ enum IslandState: Equatable {
         recording.movieStart = recording.movieStart ?? Self.movieStart(in: session)
         recording = await store.finalize(recording)
         log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
-        show(.saved(recording), for: .seconds(5))
+        switch island {
+        case .prompt: break // the next call's prompt still waits for an answer
+        default: show(.saved(recording), for: .seconds(5))
+        }
         if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey), TranscriptionSettings.service != nil {
             transcribe(recording)
         }

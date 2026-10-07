@@ -6,6 +6,19 @@ struct RepriseApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @AppStorage("onboarded") private var onboarded = false
 
+    init() {
+        if isTesting {
+            // The tests run inside the app: they get a scratch library, never the real one.
+            setenv("REPRISE_ROOT", FileManager.default.temporaryDirectory.appending(path: "reprise-tests").path, 1)
+        } else if ProcessInfo.processInfo.environment["REPRISE_ROOT"] == nil,
+                  NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "").contains(where: { $0.processIdentifier != getpid() }) {
+            // A second copy on the same library would take the first one's recording in progress
+            // for a crashed one and "repair" it away. A scratch library (`REPRISE_ROOT`) is fine.
+            log.notice("Reprise is already running; this copy quits")
+            exit(0)
+        }
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(model: .shared)

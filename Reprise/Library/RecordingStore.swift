@@ -48,16 +48,19 @@ struct Recording: Codable, Identifiable, Hashable {
     /// Creates the folder for a recording that is about to start.
     func create(app: MeetingApp?, at date: Date) throws -> Recording {
         let stamp = date.formatted(.verbatim("\(year: .defaultDigits)-\(month: .twoDigits)-\(day: .twoDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)).\(minute: .twoDigits).\(second: .twoDigits)", timeZone: .current, calendar: .current))
-        let recording = Recording(
-            id: "\(stamp) \((app?.name ?? "Recording").replacingOccurrences(of: "/", with: "-"))", // a "/" would nest folders
-            title: app.map { "\($0.name) call" } ?? "Recording",
-            app: app,
-            startedAt: date,
-            duration: 0,
-            hasVideo: false
-        )
-        try FileManager.default.createDirectory(at: recording.folder, withIntermediateDirectories: true)
-        return recording
+        let name = "\(stamp) \((app?.name ?? "Recording").replacingOccurrences(of: "/", with: "-"))" // a "/" would nest folders
+        try FileManager.default.createDirectory(at: Self.root, withIntermediateDirectories: true)
+        // Two recordings within one second get two folders: in one, each would write over the other's sound.
+        var id = name
+        for copy in 2... {
+            do {
+                try FileManager.default.createDirectory(at: Self.root.appending(path: id, directoryHint: .isDirectory), withIntermediateDirectories: false)
+                break
+            } catch CocoaError.fileWriteFileExists {
+                id = "\(name) \(copy)"
+            }
+        }
+        return Recording(id: id, title: app.map { "\($0.name) call" } ?? "Recording", app: app, startedAt: date, duration: 0, hasVideo: false)
     }
 
     func transcript(of recording: Recording) -> String? {
@@ -96,21 +99,26 @@ struct Recording: Codable, Identifiable, Hashable {
     @discardableResult
     func finalize(_ recording: Recording) async -> Recording {
         var recording = recording
-        if FileManager.default.fileExists(atPath: recording.partialAudioURL.path),
-           (try? await Self.remux(recording.partialAudioURL, to: recording.finalAudioURL)) != nil {
-            try? FileManager.default.removeItem(at: recording.partialAudioURL)
+        var remuxed = false
+        if FileManager.default.fileExists(atPath: recording.partialAudioURL.path) {
+            remuxed = (try? await Self.remux(recording.partialAudioURL, to: recording.finalAudioURL)) != nil
         }
-        if recording.hasVideo, let offset = recording.movieStart,
-           (try? await Self.replaceSound(of: recording.videoURL, with: recording.finalAudioURL, from: offset)) == nil {
-            log.error("The movie has no sound: the call's sound couldn't be added")
+        if recording.hasVideo {
+            let sound = remuxed ? recording.finalAudioURL : recording.audioURL
+            let merged = if let offset = recording.movieStart {
+                (try? await Self.replaceSound(of: recording.videoURL, with: sound, from: offset)) != nil
+            } else { false }
+            // A movie that won't open, or one without the call's sound: the library plays the audio
+            // instead of a silent movie. The movie stays in the folder.
+            if !merged {
+                log.error("The movie couldn't get the call's sound; the library plays the audio instead")
+                recording.hasVideo = false
+            }
         }
+        // The stream goes last: a crash before this repeats the whole repair on the next launch.
+        if remuxed { try? FileManager.default.removeItem(at: recording.partialAudioURL) }
         if recording.duration == 0, let seconds = try? await AVURLAsset(url: recording.audioURL).load(.duration).seconds {
             recording.duration = seconds // a recording cut short by a crash
-        }
-        // A screen recording that failed, or was cut short before its movie was finished:
-        // play the audio instead of a movie that won't open.
-        if recording.hasVideo, !((try? await AVURLAsset(url: recording.videoURL).load(.isPlayable)) ?? false) {
-            recording.hasVideo = false
         }
         save(recording)
         return recording

@@ -67,6 +67,21 @@ struct MixDownTests {
     @Test func staysInsideAShortBuffer() {
         #expect(mix([(1, [0.5, 0.5]), (1, [0.25])], micChannels: 1).samples == [0.75, 0.5])
     }
+
+    /// A headset microphone at 24 kHz going into a 48 kHz file, 40 ms at a time.
+    @Test func resamplesAMicrophoneAtAnotherRate() throws {
+        let mic = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
+        let converter = AVAudioConverter(from: mic, to: AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!)!
+        let cycle = AVAudioPCMBuffer(pcmFormat: mic, frameCapacity: 960)!
+        cycle.frameLength = 960
+        let out = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: 4096)!
+        var total = 0
+        for _ in 0..<25 {
+            try AudioRecorder.convert(cycle, with: converter, into: out)
+            total += Int(out.frameLength)
+        }
+        #expect(abs(total - 48_000) < 200) // a second in, a second out: the sound keeps its speed
+    }
 }
 
 @MainActor struct MeetingDetectorTests {
@@ -90,10 +105,11 @@ struct MixDownTests {
             (0, [zoom], [zoom]),
             (1, [zoom], [zoom]), // a quick mic check isn't a call yet
             (2, [zoom], [zoom]),
-            (40, [], [zoom]), // muted with the mic closed, still playing the others
+            (200, [], [zoom]), // muted for minutes with the mic closed, still playing the others
         ]
         #expect(events(muted) == ["start Zoom"])
-        #expect(events(muted + [(41, [], [])]) == ["start Zoom", "end Zoom"]) // silent: the call is over
+        #expect(events(muted + [(201, [], [])]) == ["start Zoom", "end Zoom"]) // silent: the call is over
+        #expect(events(muted + [(303, [], [zoom])]) == ["start Zoom", "end Zoom"]) // sound left running after the call
     }
 
     @Test func browserEndsSoonAfterTheMicCloses() {
@@ -149,5 +165,68 @@ struct UpdaterTests {
                       ("v0.3.0", "0.3.0", false), ("v0.2.9", "0.3.0", false), ("v0.9.0", "0.10.0", false)])
     func comparesVersionsNumerically(tag: String, current: String, newer: Bool) {
         #expect(release(tag).isNewer(than: current) == newer)
+    }
+}
+
+@MainActor struct RecordingStoreTests {
+    let store = RecordingStore()
+
+    @Test func testsGetAScratchLibrary() {
+        #expect(isTesting)
+        #expect(RecordingStore.root.path.contains("reprise-tests"))
+    }
+
+    @Test func recordingsInOneSecondGetTheirOwnFolders() throws {
+        let date = Date(timeIntervalSince1970: 0)
+        let first = try store.create(app: nil, at: date), second = try store.create(app: nil, at: date)
+        defer { [first, second].forEach { try? FileManager.default.removeItem(at: $0.folder) } }
+        #expect(first.id != second.id)
+    }
+
+    @Test func movieGetsTheCallsSound() async throws {
+        let recording = try await screenRecording(movieStart: 0.5)
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        #expect(await store.finalize(recording).hasVideo)
+        #expect(!FileManager.default.fileExists(atPath: recording.partialAudioURL.path))
+        #expect(try await AVURLAsset(url: recording.videoURL).loadTracks(withMediaType: .audio).count == 1)
+    }
+
+    /// A crash before the movie's start was known: the call's sound plays, not a silent movie.
+    @Test func withoutTheMoviesStartTheAudioPlays() async throws {
+        let recording = try await screenRecording(movieStart: nil)
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        #expect(await store.finalize(recording).hasVideo == false)
+        #expect(FileManager.default.fileExists(atPath: recording.videoURL.path)) // still in the folder
+    }
+
+    /// Two seconds of sound in the crash-safe stream and a second of movie without sound, as a recording leaves them.
+    private func screenRecording(movieStart: TimeInterval?) async throws -> Recording {
+        var recording = try store.create(app: nil, at: .now)
+        recording.hasVideo = true
+        recording.movieStart = movieStart
+
+        let file = try AVAudioFile(forWriting: recording.partialAudioURL, settings: AudioRecorder.fileSettings(rate: 48_000), commonFormat: .pcmFormatFloat32, interleaved: false)
+        let sound = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!, frameCapacity: 96_000)!
+        sound.frameLength = 96_000
+        for i in 0..<96_000 { sound.floatChannelData![0][i] = 0.3 * sin(Float(i) * 2 * .pi / 109) }
+        try file.write(from: sound)
+        file.close()
+
+        let writer = try AVAssetWriter(outputURL: recording.videoURL, fileType: .mov)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 64, AVVideoHeightKey: 64])
+        let frames = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
+        writer.add(input)
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+        var pixels: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA, nil, &pixels)
+        for frame in 0..<30 {
+            while !input.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(10)) }
+            frames.append(pixels!, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: 30))
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+        store.save(recording)
+        return recording
     }
 }
