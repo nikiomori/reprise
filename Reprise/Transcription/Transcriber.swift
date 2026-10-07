@@ -44,8 +44,9 @@ enum TranscriptionSettings {
 
 nonisolated enum Transcriber {
     /// Long recordings are split into 10-minute pieces to stay under the
-    /// 25 MB / duration limits most providers enforce.
-    static func transcribe(
+    /// 25 MB / duration limits most providers enforce. Off the main thread: each piece
+    /// is read whole into the upload.
+    @concurrent static func transcribe(
         _ audio: URL, service: TranscriptionService, apiKey: String?, language: String?,
         progress: @Sendable (Double) async -> Void
     ) async throws -> String {

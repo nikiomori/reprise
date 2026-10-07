@@ -83,7 +83,8 @@ import Security
     }
 
     /// Unpacked next to this copy, on the same volume, so the swap is a rename.
-    private nonisolated static func download(_ url: URL) async throws -> URL {
+    /// Off the main thread: it waits for ditto to unpack the whole app.
+    @concurrent private nonisolated static func download(_ url: URL) async throws -> URL {
         let (zip, response) = try await URLSession.shared.download(from: url)
         defer { try? FileManager.default.removeItem(at: zip) }
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure(errorDescription: "The download failed. Try again later.") }
