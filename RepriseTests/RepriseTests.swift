@@ -63,6 +63,47 @@ struct MixDownTests {
     @Test func clipsInsteadOfWrapping() {
         #expect(mix([(1, [0.9]), (1, [0.9])], micChannels: 1).samples == [1])
     }
+
+    @Test func staysInsideAShortBuffer() {
+        #expect(mix([(1, [0.5, 0.5]), (1, [0.25])], micChannels: 1).samples == [0.75, 0.5])
+    }
+}
+
+@MainActor struct MeetingDetectorTests {
+    let zoom = MeetingApp.known.first { $0.id == "us.zoom.xos" }!
+    let chrome = MeetingApp.known.first { $0.id == "com.google.Chrome" }!
+
+    typealias Step = (after: TimeInterval, microphone: Set<MeetingApp>, audible: Set<MeetingApp>)
+
+    private func events(_ steps: [Step]) -> [String] {
+        let detector = MeetingDetector()
+        var events: [String] = []
+        detector.onStart = { events.append("start \($0.name)") }
+        detector.onEnd = { events.append("end \($0.name)") }
+        let start = Date.now
+        for step in steps { detector.update(now: start + step.after, microphone: step.microphone, audible: step.audible) }
+        return events
+    }
+
+    @Test func callAppSurvivesALongMuteAndEndsWhenSilent() {
+        let muted: [Step] = [
+            (0, [zoom], [zoom]),
+            (1, [zoom], [zoom]), // a quick mic check isn't a call yet
+            (2, [zoom], [zoom]),
+            (40, [], [zoom]), // muted with the mic closed, still playing the others
+        ]
+        #expect(events(muted) == ["start Zoom"])
+        #expect(events(muted + [(41, [], [])]) == ["start Zoom", "end Zoom"]) // silent: the call is over
+    }
+
+    @Test func browserEndsSoonAfterTheMicCloses() {
+        #expect(events([
+            (0, [chrome], [chrome]),
+            (2, [chrome], [chrome]),
+            (5, [], [chrome]), // a video still playing after the call
+            (13, [], [chrome]),
+        ]) == ["start Google Chrome", "end Google Chrome"])
+    }
 }
 
 struct WaveformTests {

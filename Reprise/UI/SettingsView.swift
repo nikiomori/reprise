@@ -152,7 +152,7 @@ private struct TranscriptionSettingsView: View {
                     SecureField("API key", text: $apiKey, prompt: Text("Not needed for local servers"))
                         .onChange(of: apiKey) { TranscriptionSettings.apiKey = apiKey }
                         .onChange(of: baseURL) { apiKey = TranscriptionSettings.apiKey ?? "" }
-                    TextField("Language", text: $language, prompt: Text("Detect automatically"))
+                    TextField("Language", text: $language, prompt: Text("Automatic, or a code like en or ru"))
                     Toggle("Transcribe calls automatically", isOn: $auto)
                 }
             } footer: {

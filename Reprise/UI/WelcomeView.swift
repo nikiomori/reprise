@@ -75,11 +75,13 @@ struct WelcomeView: View {
     private func requestAudio() async {
         guard await AVCaptureDevice.requestAccess(for: .audio) else { return }
         // A blink of a recording makes macOS ask for system-audio access now rather than mid-call.
-        let probe = AudioRecorder(url: FileManager.default.temporaryDirectory.appending(path: "reprise-probe.m4a"))
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-probe.m4a")
+        let probe = AudioRecorder(url: url)
         await Task.detached {
             try? probe.start()
             try? await Task.sleep(for: .milliseconds(600))
             probe.stop()
+            try? FileManager.default.removeItem(at: url)
         }.value
         withAnimation(.spring) { audioGranted = true }
     }

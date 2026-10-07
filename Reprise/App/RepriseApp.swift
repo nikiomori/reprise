@@ -80,6 +80,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return .terminateLater
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AppModel.shared.discardPrerollBeforeQuit()
+    }
 }
 
 /// Lives in the menu bar for the app's whole life, so it also opens windows on behalf of

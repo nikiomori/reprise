@@ -25,7 +25,7 @@ final class IslandPanel: NSPanel {
         }
         NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: self, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
+                guard let self, self.frame.origin != self.placed else { return } // only a drag picks a spot
                 UserDefaults.standard.set(NSStringFromPoint(self.frame.origin), forKey: Self.originKey)
             }
         }
@@ -41,11 +41,11 @@ final class IslandPanel: NSPanel {
 
     override var canBecomeKey: Bool { false }
 
-    /// Off screen while there's nothing to show: no clicks to catch, nothing for the window server to composite.
+    /// Off screen while there's nothing to show: nothing for the window server to composite.
+    /// Never touch `ignoresMouseEvents`: once set (even to false), the clear parts of the
+    /// panel stop letting clicks through to the windows below.
     private func followIsland() {
-        let hidden = AppModel.shared.island == .hidden
-        ignoresMouseEvents = hidden
-        if hidden {
+        if AppModel.shared.island == .hidden {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in // after the exit animation
                 if AppModel.shared.island == .hidden { self?.orderOut(nil) }
             }
@@ -57,14 +57,21 @@ final class IslandPanel: NSPanel {
         }
     }
 
+    /// Where Reprise itself last put the panel. `setFrameOrigin` posts `didMove` too, and
+    /// remembering those spots would pin the island off-center after a display change.
+    private var placed = CGPoint.zero
+
     /// The remembered spot if it's still on a screen, otherwise centered under the menu bar.
     private func reposition() {
         if let saved = UserDefaults.standard.string(forKey: Self.originKey).map(NSPointFromString),
            NSScreen.screens.contains(where: { $0.visibleFrame.intersects(CGRect(origin: saved, size: Self.size)) }) {
-            return setFrameOrigin(saved)
+            placed = saved
+        } else if let screen = NSScreen.screens.first {
+            placed = CGPoint(x: (screen.frame.midX - Self.size.width / 2).rounded(), y: (screen.visibleFrame.maxY - Self.size.height).rounded())
+        } else {
+            return
         }
-        guard let screen = NSScreen.screens.first else { return }
-        setFrameOrigin(CGPoint(x: screen.frame.midX - Self.size.width / 2, y: screen.visibleFrame.maxY - Self.size.height))
+        setFrameOrigin(placed)
     }
 }
 
@@ -138,7 +145,7 @@ private struct PromptContent: View {
     let app: MeetingApp
     let model: AppModel
     @State private var appeared = Date.now
-    private let timeout: TimeInterval = 20
+    private let timeout = AppModel.promptSeconds
 
     var body: some View {
         HStack(spacing: 12) {
@@ -222,6 +229,7 @@ private struct ScreenToggle: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .help(model.recordScreen ? "Recording the screen too" : "Also record the screen")
+        .accessibilityLabel("Record the screen")
     }
 }
 

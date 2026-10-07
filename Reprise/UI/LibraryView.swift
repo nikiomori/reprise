@@ -82,7 +82,8 @@ struct LibraryView: View {
         return grouped.keys.sorted(by: >).map { day in
             let title = calendar.isDateInToday(day) ? "Today"
                 : calendar.isDateInYesterday(day) ? "Yesterday"
-                : day.formatted(.dateTime.weekday(.wide).day().month(.wide))
+                : calendar.isDate(day, equalTo: .now, toGranularity: .year) ? day.formatted(.dateTime.weekday(.wide).day().month(.wide))
+                : day.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
             return (title, grouped[day]!)
         }
     }
@@ -205,18 +206,22 @@ private struct RecordingDetail: View {
     private(set) var time: Double = 0
     private(set) var duration: Double = 0
     private(set) var isPlaying = false
-    var rate: Float = 1 { didSet { if isPlaying { avPlayer.rate = rate } } }
+    var rate: Float = 1 {
+        didSet {
+            avPlayer.defaultRate = rate // the video's own play button uses it too
+            if isPlaying { avPlayer.rate = rate }
+        }
+    }
     @ObservationIgnored private var observers: [Any] = []
 
     init(url: URL) {
         avPlayer = AVPlayer(url: url)
+        // Also called when playback starts or stops — at the end, or from the video's own controls.
         observers.append(avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] time in
-            MainActor.assumeIsolated { self?.time = time.seconds }
-        })
-        observers.append(NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: avPlayer.currentItem, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.isPlaying = false
-                self?.seek(to: 0)
+                guard let self else { return }
+                self.time = time.seconds
+                if self.isPlaying != (self.avPlayer.rate != 0) { self.isPlaying.toggle() }
             }
         })
         Task { duration = (try? await avPlayer.currentItem?.asset.load(.duration).seconds) ?? 0 }
@@ -224,6 +229,7 @@ private struct RecordingDetail: View {
 
     func toggle() {
         isPlaying.toggle()
+        if isPlaying, duration > 0, time >= duration - 0.1 { seek(to: 0) } // played to the end: from the top
         isPlaying ? avPlayer.playImmediately(atRate: rate) : avPlayer.pause()
     }
 

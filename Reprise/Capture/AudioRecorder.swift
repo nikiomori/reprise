@@ -19,11 +19,15 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let peak = Mutex<Float>(0)
     private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
+    private let written = Mutex(0)
 
     init(url: URL) { self.url = url }
 
     /// False while nothing but silence has arrived — usually a missing privacy permission.
     var hasHeardSound: Bool { heard.withLock { $0 } }
+
+    /// Frames that made it into the file. Stuck while the device is gone or the disk is full.
+    var framesWritten: Int { written.withLock { $0 } }
 
     /// Peak level (0...1) since the last read; read it from the UI at frame rate.
     func readLevel() -> Float { peak.withLock { level in defer { level = 0 }; return level } }
@@ -105,7 +109,8 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         voices.withLock { $0 = (max($0.you, you), max($0.them, them)) }
         if loudest > 0 { heard.withLock { $0 = true } }
         mix.frameLength = AVAudioFrameCount(frames)
-        try? file.write(from: mix)
+        guard (try? file.write(from: mix)) != nil else { return }
+        written.withLock { $0 += frames }
     }
 
     /// Mixes one IO cycle of interleaved Float32 buffers down to mono: the average of the
@@ -127,12 +132,13 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         for buffer in buffers {
             let count = Int(buffer.mNumberChannels)
             defer { channel += count }
-            guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+            guard count > 0, let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+            let available = min(frames, Int(buffer.mDataByteSize) / (MemoryLayout<Float>.size * count)) // never read past a short buffer
             for c in 0..<count {
                 let isMic = channel + c < micChannels
                 let weight = isMic ? micWeight : systemWeight
                 var loudest: Float = 0
-                for f in 0..<frames {
+                for f in 0..<available {
                     let sample = data[f * count + c]
                     out[f] += sample * weight
                     loudest = max(loudest, abs(sample))

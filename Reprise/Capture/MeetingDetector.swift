@@ -13,6 +13,12 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
 
     var isKnownCallApp: Bool { Self.known.contains(self) }
 
+    var isBrowser: Bool { Self.browsers.contains(self) }
+
+    // The same app whatever language its name comes in.
+    nonisolated static func == (a: Self, b: Self) -> Bool { a.id == b.id }
+    nonisolated func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
     var rule: Rule {
         get { UserDefaults.standard.string(forKey: Rule.key(id)).flatMap(Rule.init) ?? (Self.notCallApps.contains(id) ? .never : .ask) }
         nonmutating set { UserDefaults.standard.set(newValue.rawValue, forKey: Rule.key(id)) }
@@ -31,7 +37,9 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         }
     }
 
-    static let known: [MeetingApp] = [
+    static let known = callApps + browsers
+
+    private static let callApps: [MeetingApp] = [
         .init(id: "us.zoom.xos", name: "Zoom"),
         .init(id: "com.microsoft.teams2", name: "Microsoft Teams"),
         .init(id: "com.apple.FaceTime", name: "FaceTime"),
@@ -47,7 +55,10 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         .init(id: "Mattermost.Desktop", name: "Mattermost"),
         .init(id: "org.jitsi.jitsi-meet", name: "Jitsi Meet"),
         .init(id: "ru.yandex.desktop.telemost", name: "Yandex Telemost"),
-        // Browsers — Google Meet and every other web call.
+    ]
+
+    /// Google Meet and every other web call.
+    private static let browsers: [MeetingApp] = [
         .init(id: "com.google.Chrome", name: "Google Chrome"),
         .init(id: "com.apple.Safari", name: "Safari"),
         .init(id: "company.thebrowser.Browser", name: "Arc"),
@@ -97,7 +108,11 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     private var timer: Timer?
     private var watched: Set<AudioObjectID> = []
 
-    private let endGrace: TimeInterval = 10 // survive brief mic drops (muting in some apps)
+    // ponytail: two fixed values; per-app tuning if some app's calls end with a long tail.
+    /// How long an app may keep playing sound with the mic closed before its call counts as over.
+    /// A call app doing that is muted (some close the mic on mute); a browser may just be
+    /// playing a video after the call, and Reprise holding the mic keeps headphones in call mode.
+    private func endGrace(_ app: MeetingApp) -> TimeInterval { app.isBrowser ? 10 : 60 }
 
     /// Core Audio calls back when any app starts or stops audio, so between calls Reprise does no work.
     func start() {
@@ -147,8 +162,12 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     private func tick() {
         defer { schedule() }
         watchNewObjects()
-        let now = Date.now
-        let (audible, current) = Self.audioApps()
+        let (audible, microphone) = Self.audioApps()
+        update(now: .now, microphone: microphone, audible: audible)
+    }
+
+    /// The call bookkeeping, apart from Core Audio so tests can drive it.
+    func update(now: Date, microphone current: Set<MeetingApp>, audible: Set<MeetingApp>) {
         for app in current {
             firstSeen[app] = firstSeen[app] ?? now
             lastSeen[app] = now
@@ -163,7 +182,7 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         for app in Set(firstSeen.keys).subtracting(current) {
             if !active.contains(app) {
                 firstSeen[app] = nil // a blip that never became a call
-            } else if !audible.contains(app) || now.timeIntervalSince(lastSeen[app] ?? now) >= endGrace {
+            } else if !audible.contains(app) || now.timeIntervalSince(lastSeen[app] ?? now) >= endGrace(app) {
                 // An app that mutes still plays the others; one gone silent has ended the call, so
                 // the headphones get out of their call mode right away instead of after the grace.
                 active.remove(app)

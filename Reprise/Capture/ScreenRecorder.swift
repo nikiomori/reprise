@@ -14,9 +14,18 @@ nonisolated final class ScreenRecorder: NSObject, SCRecordingOutputDelegate, @un
 
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
-    func start(url: URL) async throws {
+    /// Records the display that shows the call: the one under the call app's largest window,
+    /// otherwise the one with the menu bar.
+    func start(url: URL, showing app: MeetingApp?) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? content.displays.first else {
+        let area = { (rect: CGRect) in rect.isNull ? 0 : rect.width * rect.height }
+        let callWindow = content.windows
+            .filter { $0.windowLayer == 0 && $0.owningApplication?.bundleIdentifier == app?.id }
+            .max { area($0.frame) < area($1.frame) }
+        let underCall = callWindow.flatMap { window in
+            content.displays.max { area($0.frame.intersection(window.frame)) < area($1.frame.intersection(window.frame)) }
+        }
+        guard let display = underCall ?? content.displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? content.displays.first else {
             throw CocoaError(.featureUnsupported)
         }
         let reprise = content.applications.filter { $0.processID == getpid() }

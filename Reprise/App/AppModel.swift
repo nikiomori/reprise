@@ -63,7 +63,7 @@ enum IslandState: Equatable {
         switch app.rule {
         case .always: Task { await startRecording(app: app) }
         case .ask:
-            show(.prompt(app), for: .seconds(20))
+            show(.prompt(app), for: .seconds(Self.promptSeconds))
             if UserDefaults.standard.bool(forKey: "recordFromStart") { startPreroll(app) }
         case .never: break
         }
@@ -79,6 +79,8 @@ enum IslandState: Equatable {
     }
 
     // MARK: Recording
+
+    static let promptSeconds: TimeInterval = 20
 
     @ObservationIgnored private var starting = false
     @ObservationIgnored private var prerolling: Task<Void, Never>?
@@ -103,19 +105,23 @@ enum IslandState: Equatable {
                 try await Task.detached { try audio.start() }.value
             }
 
+            // Keep the audio going without the screen; a call is more important than its picture.
             var screen: ScreenRecorder?
+            var screenProblem: String?
             if recordScreen {
                 if ScreenRecorder.hasPermission {
                     let recorder = ScreenRecorder()
                     do {
-                        try await recorder.start(url: recording.videoURL)
+                        try await recorder.start(url: recording.videoURL, showing: app)
                         screen = recorder
                         recording.hasVideo = true
                     } catch {
-                        // Keep the audio going; a call is more important than its picture.
+                        screenProblem = "Recording without the screen: \(error.localizedDescription)"
                     }
                 } else {
+                    UserDefaults.standard.set(true, forKey: "screenAccessRequested") // Settings offers the relaunch
                     CGRequestScreenCaptureAccess()
+                    screenProblem = "Recording without the screen. Allow Screen Recording, then relaunch Reprise."
                 }
             }
             session = Session(recording: recording, audio: audio, screen: screen)
@@ -123,16 +129,31 @@ enum IslandState: Equatable {
             store.save(recording) // visible in the library right away, even if Reprise quits mid-call
             pillHidden = !UserDefaults.standard.bool(forKey: "showRecordingPill", default: true)
             pillHidden ? show(.recording, for: .seconds(2)) : show(.recording)
-            Task {
-                try? await Task.sleep(for: .seconds(5))
-                if session?.recording.id == recording.id, !audio.hasHeardSound {
-                    show(.problem("No sound is coming in. Check Privacy & Security."), for: .seconds(8))
-                }
-            }
+            if let screenProblem { show(.problem(screenProblem), for: .seconds(8)) }
+            Task { await watch(recording.id, audio) }
             if let app, !detector.active.contains(app) { await stopRecording() } // the call ended while starting
         } catch {
             log.error("Recording failed to start: \(error.localizedDescription, privacy: .public)")
             show(.problem(error.localizedDescription), for: .seconds(6))
+        }
+    }
+
+    // ponytail: warns only; restart into a new segment if lost microphones turn out to be common.
+    /// Warns once whenever the recording stops getting sound: a missing permission, a
+    /// microphone that went away (it also carries the clock for the Mac's sound), a full disk.
+    private func watch(_ id: Recording.ID, _ audio: AudioRecorder) async {
+        var written = -1
+        var warned = false
+        while true {
+            try? await Task.sleep(for: .seconds(5))
+            guard session?.recording.id == id else { return }
+            let now = audio.framesWritten
+            let problem = !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
+                : now == written ? "The recording stopped getting sound. Check the microphone and the free disk space."
+                : nil
+            if let problem, !warned { show(.problem(problem), for: .seconds(8)) }
+            warned = problem != nil
+            written = now
         }
     }
 
@@ -146,8 +167,11 @@ enum IslandState: Equatable {
                 try? FileManager.default.removeItem(at: recording.folder)
                 return
             }
-            preroll = Session(recording: recording, audio: audio, screen: nil)
-            if island != .prompt(app) { discardPreroll() } // dismissed, or the call ended, while starting
+            let early = Session(recording: recording, audio: audio, screen: nil)
+            // Dismissed, the call ended, or another call took the prompt while starting.
+            guard island == .prompt(app) else { return discard(early) }
+            discardPreroll() // never drop a running capture without stopping it
+            preroll = early
         }
     }
 
@@ -161,16 +185,28 @@ enum IslandState: Equatable {
         return preroll
     }
 
-    /// Deletes it for good, not to the Trash: it was never a recording anyone asked for.
     private func discardPreroll() {
         guard let preroll else { return }
         self.preroll = nil
-        let (audio, folder) = (preroll.audio, preroll.recording.folder)
+        discard(preroll)
+    }
+
+    /// Deletes it for good, not to the Trash: it was never a recording anyone asked for.
+    private func discard(_ early: Session) {
+        let (audio, folder) = (early.audio, early.recording.folder)
         Task.detached { // see finish(_:)
             audio.stop()
             try? FileManager.default.removeItem(at: folder)
         }
         log.notice("Discarded the early capture of an unanswered prompt")
+    }
+
+    /// Quitting while the prompt asks: the early capture goes now, not on the next launch.
+    func discardPrerollBeforeQuit() {
+        guard let preroll else { return }
+        self.preroll = nil
+        preroll.audio.stop()
+        try? FileManager.default.removeItem(at: preroll.recording.folder)
     }
 
     /// The stop in progress, so quitting can wait until the files are written.

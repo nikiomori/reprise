@@ -47,7 +47,7 @@ struct Recording: Codable, Identifiable, Hashable {
     func create(app: MeetingApp?, at date: Date) throws -> Recording {
         let stamp = date.formatted(.verbatim("\(year: .defaultDigits)-\(month: .twoDigits)-\(day: .twoDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)).\(minute: .twoDigits).\(second: .twoDigits)", timeZone: .current, calendar: .current))
         let recording = Recording(
-            id: "\(stamp) \(app?.name ?? "Recording")",
+            id: "\(stamp) \((app?.name ?? "Recording").replacingOccurrences(of: "/", with: "-"))", // a "/" would nest folders
             title: app.map { "\($0.name) call" } ?? "Recording",
             app: app,
             startedAt: date,
@@ -100,6 +100,11 @@ struct Recording: Codable, Identifiable, Hashable {
         if recording.duration == 0, let seconds = try? await AVURLAsset(url: recording.audioURL).load(.duration).seconds {
             recording.duration = seconds // a recording cut short by a crash
         }
+        // A screen recording that failed, or was cut short before its movie was finished:
+        // play the audio instead of a movie that won't open.
+        if recording.hasVideo, !((try? await AVURLAsset(url: recording.videoURL).load(.isPlayable)) ?? false) {
+            recording.hasVideo = false
+        }
         save(recording)
         return recording
     }
@@ -114,7 +119,7 @@ struct Recording: Codable, Identifiable, Hashable {
 
     /// Moves the recording to the Trash, so it can be recovered.
     func delete(_ recording: Recording) {
-        try? FileManager.default.trashItem(at: recording.folder, resultingItemURL: nil)
+        guard (try? FileManager.default.trashItem(at: recording.folder, resultingItemURL: nil)) != nil else { return }
         recordings.removeAll { $0.id == recording.id }
     }
 
