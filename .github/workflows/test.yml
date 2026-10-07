@@ -4,9 +4,8 @@ on: [push, pull_request]
 
 jobs:
   test:
-    runs-on: macos-26
+    # Reprise needs Xcode 27; macos-26 tops out at Xcode 26.6, whose Swift 6.2 can't type-check it.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v5
-      # The newest Xcode on the runner: Reprise needs Xcode 27.
-      - run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
       - run: xcodebuild -project Reprise.xcodeproj -scheme Reprise -destination 'platform=macOS,arch=arm64' test
