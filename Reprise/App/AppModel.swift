@@ -157,7 +157,7 @@ enum IslandState: Equatable {
     /// without the other side (both usually a missing permission).
     private func watch(_ id: Recording.ID, _ audio: AudioRecorder) async {
         var written = -1
-        var warned = false
+        var shown: String? // each warning once while it lasts, so another one still gets through
         var stalledBefore = false
         for tick in 0... {
             // The first look comes early: until the movie's start is saved, a crash leaves it without sound.
@@ -176,8 +176,8 @@ enum IslandState: Equatable {
                 // Three minutes in: a waiting room is silent too.
                 : tick >= 36 && session.recording.app != nil && !audio.hasHeardThem ? "No sound from the other side yet. Check System Audio Recording in Privacy & Security."
                 : nil
-            if let problem, !warned { show(.problem(problem), for: .seconds(8)) }
-            warned = problem != nil
+            if let problem, problem != shown { show(.problem(problem), for: .seconds(8)) }
+            shown = problem
             if stalled {
                 log.notice("The recording stopped getting sound; restarting it on the current microphone")
                 do { try await Task.detached { try audio.restart() }.value } catch {
