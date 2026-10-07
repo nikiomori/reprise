@@ -40,6 +40,7 @@ struct MenuBarView: View {
             }
 
             MenuDivider()
+            UpdateMenuRow(updater: .shared, recording: model.session != nil)
             Button("Open Library") { open(nil) }
             SettingsLink { Text("Settings…") }
                 .keyboardShortcut(",")
@@ -83,6 +84,33 @@ private struct RecordRow: View {
         if let session = model.session { return session.recording.app.map { "\($0.name) call" } ?? "Without a call" }
         if let app = model.detector.active.first { return "Call in \(app.name)" }
         return "Waiting for calls"
+    }
+}
+
+/// Shown once an update is found, until it's installed.
+private struct UpdateMenuRow: View {
+    let updater: Updater
+    let recording: Bool
+
+    var body: some View {
+        let (release, status): (Updater.Release?, String) = switch updater.state {
+        case .available(let release): (release, recording ? "After the recording" : "Installs and relaunches")
+        case .failed(let message, let release?): (release, message)
+        case .installing: (nil, "Reprise relaunches when it's done")
+        default: (nil, "")
+        }
+        if release != nil || updater.state == .installing {
+            Button { if let release { updater.install(release) } } label: {
+                HStack(spacing: 10) {
+                    Chip(icon: "arrow.down", tint: .accentColor)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(release.map { "Update to Reprise \($0.version)" } ?? "Installing the Update…")
+                        Text(status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                }
+            }
+            .disabled(release == nil || recording)
+        }
     }
 }
 

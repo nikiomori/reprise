@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = AppModel.shared
+        _ = Updater.shared
         island = IslandPanel()
         log.notice("Launched. Microphone: \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue), screen: \(CGPreflightScreenCaptureAccess())")
         // `kill` and friends go through the normal quit, so a recording in progress gets saved.

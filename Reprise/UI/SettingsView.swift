@@ -22,6 +22,7 @@ private struct GeneralSettings: View {
     @AppStorage("callAppAudioOnly") private var callAppAudioOnly = false
     @AppStorage("screenAccessRequested") private var screenRequested = false
     @AppStorage("systemAudioHeard") private var systemAudioHeard = false
+    @AppStorage(Updater.autoKey) private var checkForUpdates = true
     @State private var loginItem = SMAppService.mainApp.status
     @State private var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screen = ScreenRecorder.hasPermission
@@ -83,12 +84,55 @@ private struct GeneralSettings: View {
                     }
                 }
             }
+            Section("Updates") {
+                Toggle("Check for updates automatically", isOn: $checkForUpdates)
+                UpdateRow(updater: .shared)
+            }
         }
         .formStyle(.grouped)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem = SMAppService.mainApp.status
             microphone = AVCaptureDevice.authorizationStatus(for: .audio)
             screen = ScreenRecorder.hasPermission
+        }
+    }
+}
+
+private struct UpdateRow: View {
+    let updater: Updater
+
+    var body: some View {
+        LabeledContent {
+            switch updater.state {
+            case .checking, .installing:
+                ProgressView().controlSize(.small)
+            case .available(let release):
+                Link("What's New", destination: release.html_url)
+                Button("Install and Relaunch") { updater.install(release) }
+                    .disabled(AppModel.shared.session != nil)
+            case .failed(_, let release?):
+                Link("Open GitHub", destination: release.html_url)
+                Button("Try Again") { updater.install(release) }
+            default:
+                Button("Check Now") { Task { await updater.check() } }
+            }
+        } label: {
+            switch updater.state {
+            case .available(let release):
+                Text("Reprise \(release.version) is available")
+                Text(AppModel.shared.session == nil ? "You have \(Updater.current)." : "You can install it after the recording.")
+            case .installing:
+                Text("Installing the update…")
+                Text("Reprise relaunches when it's done.")
+            default:
+                Text("Reprise \(Updater.current)")
+                switch updater.state {
+                case .checking: Text("Checking…")
+                case .upToDate: Text("This is the latest version.")
+                case .failed(let message, _): Text(message)
+                default: EmptyView()
+                }
+            }
         }
     }
 }

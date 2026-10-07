@@ -139,3 +139,15 @@ struct EncoderDelayTests {
         #expect(onset.map { abs($0 - (48_000 + AudioRecorder.encoderDelay)) < 24 } == true)
     }
 }
+
+struct UpdaterTests {
+    private func release(_ tag: String) -> Updater.Release {
+        Updater.Release(tag_name: tag, html_url: URL(string: "https://github.com")!, assets: [])
+    }
+
+    @Test(arguments: [("v0.4.0", "0.3.0", true), ("v0.10.0", "0.9.0", true), ("0.3.1", "0.3.0", true),
+                      ("v0.3.0", "0.3.0", false), ("v0.2.9", "0.3.0", false), ("v0.9.0", "0.10.0", false)])
+    func comparesVersionsNumerically(tag: String, current: String, newer: Bool) {
+        #expect(release(tag).isNewer(than: current) == newer)
+    }
+}

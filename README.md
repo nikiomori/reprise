@@ -71,6 +71,17 @@ A video of the prompt and the pill: [docs/media/island.mp4](docs/media/island.mp
 
 Reprise has a Developer ID signature, and Apple notarized it. Thus macOS opens it without a warning.
 
+## Update
+
+Reprise checks GitHub for a new version one time each day. When a new version is available, the Reprise menu shows **Update to Reprise** and the version number.
+
+1. Select **Update to Reprise**. Or open **Settings > General** and select **Install and Relaunch**.
+2. Reprise downloads the new version, examines its signature, and starts again.
+
+Reprise installs a new version only if it has the same Developer ID signature. Thus a build from the source code does not install updates. During a recording, Reprise does not install an update.
+
+To stop the automatic check, open **Settings > General**. Then clear **Check for updates automatically**.
+
 ## Use Reprise
 
 ### Record a call
