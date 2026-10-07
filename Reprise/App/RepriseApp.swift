@@ -51,7 +51,7 @@ struct RepriseApp: App {
     }
 }
 
-/// File and Help menus: what a Mac app's menu bar is expected to offer while its window is open.
+/// File and Help menus, and Find…: what a Mac app's menu bar is expected to offer while its window is open.
 private struct RecordingCommands: Commands {
     let model: AppModel
 
@@ -63,6 +63,11 @@ private struct RecordingCommands: Commands {
             Button("Stop Recording") { Task { await model.stopRecording() } }
                 .keyboardShortcut(".")
                 .disabled(model.session == nil)
+        }
+        // In the Edit menu, where Mail and Notes have it. `TextEditingCommands`' Find… doesn't reach the search field.
+        CommandGroup(after: .textEditing) {
+            Button("Find…") { NotificationCenter.default.post(name: .findCalls, object: nil) }
+                .keyboardShortcut("f")
         }
         // Instead of the default item, which only says help isn't available.
         CommandGroup(replacing: .help) {
@@ -146,6 +151,8 @@ private struct MenuBarIcon: View {
 extension Notification.Name {
     /// Object: a window ID — "library", "welcome" or "settings".
     static let openRepriseWindow = Notification.Name("openRepriseWindow")
+    /// Edit > Find…: to the library's search field.
+    static let findCalls = Notification.Name("findCalls")
 }
 
 extension NSImage {

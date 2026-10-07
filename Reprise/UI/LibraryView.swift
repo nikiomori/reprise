@@ -5,6 +5,7 @@ struct LibraryView: View {
     @Bindable var model: AppModel
     @State private var search = ""
     @FocusState private var listFocused: Bool
+    @FocusState private var searchFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.undoManager) private var undoManager
 
@@ -33,6 +34,7 @@ struct LibraryView: View {
             .focused($listFocused)
             .defaultFocus($listFocused, true) // not the title field, which would select itself
             .searchable(text: $search, placement: .sidebar, prompt: "Search calls")
+            .searchFocused($searchFocused)
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
             .onDeleteCommand { if let selected { model.delete(selected, shown: shown, undo: undoManager) } }
             .overlay {
@@ -75,6 +77,7 @@ struct LibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.store.reload() // calls removed or added in Finder meanwhile
         }
+        .onReceive(NotificationCenter.default.publisher(for: .findCalls)) { _ in searchFocused = true }
     }
 
     private var selected: Recording? {
