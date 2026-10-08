@@ -184,7 +184,7 @@ extension NSImage {
             return true
         }
         image.isTemplate = !recording
-        image.accessibilityDescription = recording ? "Reprise — recording" : "Reprise"
+        image.accessibilityDescription = recording ? String(localized: "Reprise — recording") : "Reprise"
         return image
     }
 }

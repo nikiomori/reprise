@@ -19,6 +19,8 @@
 		796A40F671A89D120CEDA539 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7DEFA51BD022745B069C07 /* LibraryView.swift */; };
 		7FAAF0B280BA1AADCD3A49A6 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91D5314F710C5FABF64E3E34 /* MenuBarView.swift */; };
 		823A46C262162C27111ED865 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5EA41968814ACF5C3D8CFAC /* AudioRecorder.swift */; };
+		9CCFD1A41E7DA5519FC3C862 /* AppShortcuts.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8B74C2926E335B3CA694E824 /* AppShortcuts.xcstrings */; };
+		A6664C5B85D3DAAF12320CE0 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0AA994BD5852FCD005070692 /* Localizable.xcstrings */; };
 		AB50DEE52BBD9F8DFE9CEC9D /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBD3826D223B00CA49B5672 /* ScreenRecorder.swift */; };
 		AEBA9355CB7CB56FE35F41E7 /* DebugSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B032CD642845CDF71426E4 /* DebugSnapshots.swift */; };
 		AF00D98313B1887E57FD05D8 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530209C8AB6693871B1104C6 /* WelcomeView.swift */; };
@@ -26,6 +28,7 @@
 		F4917861A14FCC528E83DED7 /* Transcriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC49C9C574B9EDCD3B3B6CA0 /* Transcriber.swift */; };
 		F5CAC0F1C3EF214CAD305B9A /* RepriseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF754BB3AA3ED57830AA2ED /* RepriseApp.swift */; };
 		F8BC91208B0BF63DB91862A3 /* CoreAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB88BA6CED02E9A036994DC /* CoreAudio.swift */; };
+		FBD186C39D57D14E51358BA3 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AD0BD910C3EB44BFE767B269 /* InfoPlist.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,6 +43,7 @@
 
 /* Begin PBXFileReference section */
 		08EF97DBBD3CD208C15D737C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0AA994BD5852FCD005070692 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		1D223B7738F8D7E2EEB012EA /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
 		20B146D1772A5562897F2A7A /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		28571E0825C5C03BFAA9CA6F /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
@@ -50,9 +54,11 @@
 		7B7DEFA51BD022745B069C07 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		81C1FDC30EE7E8205BF02A6B /* Island.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Island.swift; sourceTree = "<group>"; };
 		892A0B78D5E7B007506D76FF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8B74C2926E335B3CA694E824 /* AppShortcuts.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AppShortcuts.xcstrings; sourceTree = "<group>"; };
 		8E81ABB7728C79F330920819 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		91D5314F710C5FABF64E3E34 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		930066FC9B07075718F9F50C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		AD0BD910C3EB44BFE767B269 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		B5EA41968814ACF5C3D8CFAC /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		B9043239B474E12ECE71F5FD /* MeetingDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetector.swift; sourceTree = "<group>"; };
 		BF6805715BFAFB008B2F07E3 /* RepriseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepriseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -98,7 +104,10 @@
 			isa = PBXGroup;
 			children = (
 				8E81ABB7728C79F330920819 /* AppIcon.icon */,
+				8B74C2926E335B3CA694E824 /* AppShortcuts.xcstrings */,
 				08EF97DBBD3CD208C15D737C /* Info.plist */,
+				AD0BD910C3EB44BFE767B269 /* InfoPlist.xcstrings */,
+				0AA994BD5852FCD005070692 /* Localizable.xcstrings */,
 				E82CE4AFB2ECB01BB6C1618C /* Reprise.entitlements */,
 			);
 			path = Resources;
@@ -260,6 +269,7 @@
 			knownRegions = (
 				Base,
 				en,
+				ru,
 			);
 			mainGroup = F842894A1560CC691959AE6F;
 			minimizedProjectReferenceProxies = 1;
@@ -280,6 +290,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				33A081B7DA3D70FBF24411CE /* AppIcon.icon in Resources */,
+				9CCFD1A41E7DA5519FC3C862 /* AppShortcuts.xcstrings in Resources */,
+				FBD186C39D57D14E51358BA3 /* InfoPlist.xcstrings in Resources */,
+				A6664C5B85D3DAAF12320CE0 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -401,6 +414,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.3.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -411,6 +425,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
@@ -467,6 +482,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.3.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -476,6 +492,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;

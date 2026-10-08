@@ -1,0 +1,1965 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ call" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звонок в %@"
+          }
+        }
+      }
+    },
+    "%@ of %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ из %@"
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "shouldTranslate" : false
+    },
+    "%@: Record this call?" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: записать этот звонок?"
+          }
+        }
+      }
+    },
+    "%@×" : {
+      "shouldTranslate" : false
+    },
+    "0:12" : {
+      "shouldTranslate" : false
+    },
+    "1 Month" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 месяц"
+          }
+        }
+      }
+    },
+    "1 Week" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 неделю"
+          }
+        }
+      }
+    },
+    "3 Months" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 месяца"
+          }
+        }
+      }
+    },
+    "A call gets the title of the event going on when it starts." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звонок получает название события, которое идёт, когда он начинается."
+          }
+        }
+      }
+    },
+    "API key" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ключ API"
+          }
+        }
+      }
+    },
+    "After Each Call" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После каждого звонка"
+          }
+        }
+      }
+    },
+    "After the recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После записи"
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить"
+          }
+        }
+      }
+    },
+    "Allow Reprise in Login Items." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите Reprise в разделе «Объекты входа»."
+          }
+        }
+      }
+    },
+    "Allowed" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешено"
+          }
+        }
+      }
+    },
+    "Already switched it on?" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уже включили?"
+          }
+        }
+      }
+    },
+    "Also record the screen" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывать и экран"
+          }
+        }
+      }
+    },
+    "Also save each side in its own file" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранять каждую сторону в отдельный файл"
+          }
+        }
+      }
+    },
+    "Always Record" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Всегда записывать"
+          }
+        }
+      }
+    },
+    "Always Record %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Всегда записывать %@"
+          }
+        }
+      }
+    },
+    "Apps" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложения"
+          }
+        }
+      }
+    },
+    "Apps that used the microphone for more than 10 seconds." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложения, которые держали микрофон дольше 10 секунд."
+          }
+        }
+      }
+    },
+    "Ask" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спрашивать"
+          }
+        }
+      }
+    },
+    "Automatic" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматически"
+          }
+        }
+      }
+    },
+    "Back 15 Seconds" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назад на 15 секунд"
+          }
+        }
+      }
+    },
+    "Back 15 seconds" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назад на 15 секунд"
+          }
+        }
+      }
+    },
+    "Be present. Reprise remembers." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Будьте в разговоре. Reprise запомнит."
+          }
+        }
+      }
+    },
+    "Browsers" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Браузеры"
+          }
+        }
+      }
+    },
+    "Calendars" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Календари"
+          }
+        }
+      }
+    },
+    "Call Apps" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложения для звонков"
+          }
+        }
+      }
+    },
+    "Call in %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Идёт звонок в %@"
+          }
+        }
+      }
+    },
+    "Check Now" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить"
+          }
+        }
+      }
+    },
+    "Check for updates automatically" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматически проверять обновления"
+          }
+        }
+      }
+    },
+    "Checking…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка…"
+          }
+        }
+      }
+    },
+    "Click to rename" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите, чтобы переименовать"
+          }
+        }
+      }
+    },
+    "Connect a transcription service to turn calls into text." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключите сервис расшифровки, чтобы превращать звонки в текст."
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировать"
+          }
+        }
+      }
+    },
+    "Couldn't %@ (Core Audio error %d)." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось %@ (ошибка Core Audio %d)."
+          }
+        }
+      }
+    },
+    "Couldn't prepare the audio for upload." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось подготовить звук к отправке."
+          }
+        }
+      }
+    },
+    "Couldn't unpack the update." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось распаковать обновление."
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свой"
+          }
+        }
+      }
+    },
+    "Don't Record" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не записывать"
+          }
+        }
+      }
+    },
+    "Everyone else on the call" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Все остальные участники звонка"
+          }
+        }
+      }
+    },
+    "Everyone else — macOS asks the first time you record" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Все остальные — macOS спросит при первой записи"
+          }
+        }
+      }
+    },
+    "Find…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Найти…"
+          }
+        }
+      }
+    },
+    "Finish the recording, then install the update." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершите запись, затем установите обновление."
+          }
+        }
+      }
+    },
+    "For Google Meet and other calls on the web." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для Google Meet и других звонков в браузере."
+          }
+        }
+      }
+    },
+    "Forever" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бессрочно"
+          }
+        }
+      }
+    },
+    "Forward 15 Seconds" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вперёд на 15 секунд"
+          }
+        }
+      }
+    },
+    "Forward 15 seconds" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вперёд на 15 секунд"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основные"
+          }
+        }
+      }
+    },
+    "GitHub answered %lld. Try again later." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub ответил с кодом %lld. Повторите попытку позже."
+          }
+        }
+      }
+    },
+    "Google Meet · Record this call?" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google Meet · Записать этот звонок?"
+          }
+        }
+      }
+    },
+    "Hide Until the Call Ends" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть до конца звонка"
+          }
+        }
+      }
+    },
+    "Ignore" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игнорировать"
+          }
+        }
+      }
+    },
+    "Ignore %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игнорировать %@"
+          }
+        }
+      }
+    },
+    "Includes a screen recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "С записью экрана"
+          }
+        }
+      }
+    },
+    "Install and Relaunch" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установить и перезапустить"
+          }
+        }
+      }
+    },
+    "Installing the Update…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установка обновления…"
+          }
+        }
+      }
+    },
+    "Installing the update…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установка обновления…"
+          }
+        }
+      }
+    },
+    "Installs and relaunches" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установится с перезапуском"
+          }
+        }
+      }
+    },
+    "Join a call, and Reprise offers to record it." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Присоединитесь к звонку, и Reprise предложит его записать."
+          }
+        }
+      }
+    },
+    "Keep screen recordings" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранить записи экрана"
+          }
+        }
+      }
+    },
+    "Language" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Язык"
+          }
+        }
+      }
+    },
+    "Local server" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Локальный сервер"
+          }
+        }
+      }
+    },
+    "Mark This Moment" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отметить этот момент"
+          }
+        }
+      }
+    },
+    "Mark this moment" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отметить этот момент"
+          }
+        }
+      }
+    },
+    "Marked at %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмечено: %@"
+          }
+        }
+      }
+    },
+    "Marker at %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отметка на %@"
+          }
+        }
+      }
+    },
+    "Marks this moment of the call being recorded, to find it on the call's wave later." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмечает момент записываемого звонка, чтобы потом найти его на волне."
+          }
+        }
+      }
+    },
+    "Microphone" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофон"
+          }
+        }
+      }
+    },
+    "Microphone and system audio" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофон и системный звук"
+          }
+        }
+      }
+    },
+    "Model" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Модель"
+          }
+        }
+      }
+    },
+    "Move Back to the Top" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вернуть наверх"
+          }
+        }
+      }
+    },
+    "Move to Trash" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить в Корзину"
+          }
+        }
+      }
+    },
+    "Music, videos, and notification sounds from other apps stay out of the audio. A recording without a call still gets all the sound of the Mac." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Музыка, видео и звуки уведомлений других приложений не попадут в запись. Запись без звонка по-прежнему получает весь звук Mac."
+          }
+        }
+      }
+    },
+    "Name calls after calendar events" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Называть звонки по событиям календаря"
+          }
+        }
+      }
+    },
+    "New Recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новая запись"
+          }
+        }
+      }
+    },
+    "No Call Selected" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звонок не выбран"
+          }
+        }
+      }
+    },
+    "No Calls Yet" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звонков пока нет"
+          }
+        }
+      }
+    },
+    "No sound from the other side yet. Check System Audio Recording in Privacy & Security." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Собеседников пока не слышно. Проверьте запись системного звука в разделе «Конфиденциальность и безопасность»."
+          }
+        }
+      }
+    },
+    "No sound is coming in. Check Privacy & Security." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звук не поступает. Проверьте раздел «Конфиденциальность и безопасность»."
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет"
+          }
+        }
+      }
+    },
+    "Not this time" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не в этот раз"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выкл."
+          }
+        }
+      }
+    },
+    "Older ones go to the Trash. Their calls stay, with the sound." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Более старые попадут в Корзину. Сами звонки со звуком останутся."
+          }
+        }
+      }
+    },
+    "On" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вкл."
+          }
+        }
+      }
+    },
+    "Only if you record the screen" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только для записи экрана"
+          }
+        }
+      }
+    },
+    "Open" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть"
+          }
+        }
+      }
+    },
+    "Open GitHub" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть GitHub"
+          }
+        }
+      }
+    },
+    "Open Library" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть библиотеку"
+          }
+        }
+      }
+    },
+    "Open Reprise at login" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открывать Reprise при входе в систему"
+          }
+        }
+      }
+    },
+    "Open Settings" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть Настройки"
+          }
+        }
+      }
+    },
+    "Optional, for recording the screen." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По желанию, для записи экрана."
+          }
+        }
+      }
+    },
+    "Other Apps" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Другие приложения"
+          }
+        }
+      }
+    },
+    "Pause" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пауза"
+          }
+        }
+      }
+    },
+    "Permissions" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешения"
+          }
+        }
+      }
+    },
+    "Play" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Воспроизвести"
+          }
+        }
+      }
+    },
+    "Playback position" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Позиция воспроизведения"
+          }
+        }
+      }
+    },
+    "Playback speed" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скорость воспроизведения"
+          }
+        }
+      }
+    },
+    "Quit Reprise" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить Reprise"
+          }
+        }
+      }
+    },
+    "Recent" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Недавние"
+          }
+        }
+      }
+    },
+    "Record" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записать"
+          }
+        }
+      }
+    },
+    "Record calls from the first second" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывать звонки с первой секунды"
+          }
+        }
+      }
+    },
+    "Record from the start?" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записать с самого начала?"
+          }
+        }
+      }
+    },
+    "Record only the sound of the call app" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывать только звук приложения звонка"
+          }
+        }
+      }
+    },
+    "Record the Screen" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывать экран"
+          }
+        }
+      }
+    },
+    "Record the screen" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывать экран"
+          }
+        }
+      }
+    },
+    "Record the screen by default" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывать экран по умолчанию"
+          }
+        }
+      }
+    },
+    "Record this call?" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записать этот звонок?"
+          }
+        }
+      }
+    },
+    "Recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись"
+          }
+        }
+      }
+    },
+    "Recording the screen too" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Экран тоже записывается"
+          }
+        }
+      }
+    },
+    "Recording without the screen. Allow Screen Recording, then relaunch Reprise." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись без экрана. Разрешите запись экрана и перезапустите Reprise."
+          }
+        }
+      }
+    },
+    "Recording without the screen: %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись без экрана: %@"
+          }
+        }
+      }
+    },
+    "Recording you and the other people" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записываются вы и собеседники"
+          }
+        }
+      }
+    },
+    "Records the call going on, or your microphone and the sound of the Mac." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записывает идущий звонок или ваш микрофон и звук Mac."
+          }
+        }
+      }
+    },
+    "Relaunch" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустить"
+          }
+        }
+      }
+    },
+    "Relaunch Reprise" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустить Reprise"
+          }
+        }
+      }
+    },
+    "Reprise" : {
+      "shouldTranslate" : false
+    },
+    "Reprise %@" : {
+      "shouldTranslate" : false
+    },
+    "Reprise %@ is available" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступна версия Reprise %@"
+          }
+        }
+      }
+    },
+    "Reprise doesn't transcribe on the Mac yet. It sends the audio to the service you choose. Any OpenAI-compatible service works, including a Whisper server on your own Mac, so the audio never leaves it." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise пока не расшифровывает звук на Mac, а отправляет его выбранному сервису. Подойдёт любой OpenAI-совместимый сервис, в том числе сервер Whisper на вашем же Mac — тогда звук его не покидает."
+          }
+        }
+      }
+    },
+    "Reprise needs microphone access" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise нужен доступ к микрофону"
+          }
+        }
+      }
+    },
+    "Reprise notices a call when one of these apps starts using the microphone." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise замечает звонок, когда одно из этих приложений начинает использовать микрофон."
+          }
+        }
+      }
+    },
+    "Reprise on GitHub" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise на GitHub"
+          }
+        }
+      }
+    },
+    "Reprise relaunches when it's done" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise перезапустится, когда закончит"
+          }
+        }
+      }
+    },
+    "Reprise relaunches when it's done." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise перезапустится, когда закончит."
+          }
+        }
+      }
+    },
+    "Reprise — recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise — идёт запись"
+          }
+        }
+      }
+    },
+    "Required, except for local servers" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обязателен, кроме локальных серверов"
+          }
+        }
+      }
+    },
+    "Run a shortcut" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустить быструю команду"
+          }
+        }
+      }
+    },
+    "Saved" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранено"
+          }
+        }
+      }
+    },
+    "Saved in" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохраняется в"
+          }
+        }
+      }
+    },
+    "Saving…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранение…"
+          }
+        }
+      }
+    },
+    "Screen recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись экрана"
+          }
+        }
+      }
+    },
+    "Search calls" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поиск звонков"
+          }
+        }
+      }
+    },
+    "Select a call to play it." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите звонок, чтобы его прослушать."
+          }
+        }
+      }
+    },
+    "Server" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер"
+          }
+        }
+      }
+    },
+    "Service" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервис"
+          }
+        }
+      }
+    },
+    "Set Up…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настроить…"
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки…"
+          }
+        }
+      }
+    },
+    "Share…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться…"
+          }
+        }
+      }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать в Finder"
+          }
+        }
+      }
+    },
+    "Show the Floating Pill" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать плавающую капсулу"
+          }
+        }
+      }
+    },
+    "Show the floating pill while recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать плавающую капсулу во время записи"
+          }
+        }
+      }
+    },
+    "So both sides of the call end up in the recording." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы в запись попали обе стороны звонка."
+          }
+        }
+      }
+    },
+    "Speed" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скорость"
+          }
+        }
+      }
+    },
+    "Start Recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать запись"
+          }
+        }
+      }
+    },
+    "Start recording now" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать запись сейчас"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стоп"
+          }
+        }
+      }
+    },
+    "Stop Recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить запись"
+          }
+        }
+      }
+    },
+    "Stop recording" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить запись"
+          }
+        }
+      }
+    },
+    "Stops the recording and saves it." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Останавливает запись и сохраняет её."
+          }
+        }
+      }
+    },
+    "Switched it on? Relaunch to finish." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уже включили? Перезапустите, чтобы закончить."
+          }
+        }
+      }
+    },
+    "System audio" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Системный звук"
+          }
+        }
+      }
+    },
+    "The API key is kept in your Keychain." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ключ API хранится в связке ключей."
+          }
+        }
+      }
+    },
+    "The disk is full. Reprise keeps the call's sound until there's space." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Диск заполнен. Reprise держит звук звонка, пока не освободится место."
+          }
+        }
+      }
+    },
+    "The download doesn't have the signature of this copy of Reprise. Download the update from GitHub." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У загрузки не та подпись, что у этой копии Reprise. Скачайте обновление с GitHub."
+          }
+        }
+      }
+    },
+    "The download failed. Try again later." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка не удалась. Повторите попытку позже."
+          }
+        }
+      }
+    },
+    "The recording stopped getting sound. Check the microphone and the free disk space." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В запись перестал поступать звук. Проверьте микрофон и свободное место на диске."
+          }
+        }
+      }
+    },
+    "The server address isn't a valid URL." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Адрес сервера не является допустимым URL."
+          }
+        }
+      }
+    },
+    "The service answered %lld: %@." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервис ответил с кодом %lld: %@."
+          }
+        }
+      }
+    },
+    "The shortcut gets the call's folder once it's saved, with its transcript if Reprise transcribes calls automatically. It can move the files, run a script on them, or send them on." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Быстрая команда получает папку звонка, когда он сохранён, — с расшифровкой, если Reprise расшифровывает звонки автоматически. Она может переместить файлы, запустить для них скрипт или отправить их дальше."
+          }
+        }
+      }
+    },
+    "This is the latest version." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это последняя версия."
+          }
+        }
+      }
+    },
+    "This release has no app to download." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В этом выпуске нет приложения для загрузки."
+          }
+        }
+      }
+    },
+    "Title" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Название"
+          }
+        }
+      }
+    },
+    "To name calls after their events" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы называть звонки по событиям"
+          }
+        }
+      }
+    },
+    "Today" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сегодня"
+          }
+        }
+      }
+    },
+    "Transcribe" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расшифровать"
+          }
+        }
+      }
+    },
+    "Transcribe calls automatically" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расшифровывать звонки автоматически"
+          }
+        }
+      }
+    },
+    "Transcribing…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расшифровка…"
+          }
+        }
+      }
+    },
+    "Transcript" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расшифровка"
+          }
+        }
+      }
+    },
+    "Transcription" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расшифровка"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
+          }
+        }
+      }
+    },
+    "Update to Reprise %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить до Reprise %@"
+          }
+        }
+      }
+    },
+    "Updates" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновления"
+          }
+        }
+      }
+    },
+    "Waiting for calls" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ожидание звонков"
+          }
+        }
+      }
+    },
+    "Waiting for your approval" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ожидает вашего разрешения"
+          }
+        }
+      }
+    },
+    "Welcome to Reprise" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добро пожаловать в Reprise"
+          }
+        }
+      }
+    },
+    "What's New" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что нового"
+          }
+        }
+      }
+    },
+    "While Reprise asks, it already records. Select Record to keep the call from the start. If you don't, Reprise deletes that audio." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока Reprise спрашивает, он уже записывает. Нажмите «Записать», чтобы сохранить звонок с самого начала. Если не нажмёте, Reprise удалит этот звук."
+          }
+        }
+      }
+    },
+    "Without a call" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без звонка"
+          }
+        }
+      }
+    },
+    "Yesterday" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вчера"
+          }
+        }
+      }
+    },
+    "You and the others, as you.m4a and them.m4a next to the call, to edit a podcast or an interview. Takes a little more power and disk space." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы и собеседники — в файлах you.m4a и them.m4a рядом со звонком, чтобы монтировать подкаст или интервью. Чуть больше нагрузки и места на диске."
+          }
+        }
+      }
+    },
+    "You can install it after the recording." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Его можно установить после записи."
+          }
+        }
+      }
+    },
+    "You can play the call after it ends." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звонок можно будет прослушать, когда он закончится."
+          }
+        }
+      }
+    },
+    "You can play the call in a moment." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звонок можно будет прослушать через мгновение."
+          }
+        }
+      }
+    },
+    "You have %@." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У вас версия %@."
+          }
+        }
+      }
+    },
+    "Your side of the call" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваша сторона звонка"
+          }
+        }
+      }
+    },
+    "^[%lld call](inflect: true)" : {
+      "localizations" : {
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld звонка"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld звонков"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld звонок"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld звонка"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "capture system audio" : {
+      "comment" : "Completes “Couldn't …”",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "захватить системный звук"
+          }
+        }
+      }
+    },
+    "create the recording device" : {
+      "comment" : "Completes “Couldn't …”",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "создать устройство записи"
+          }
+        }
+      }
+    },
+    "find an audio device" : {
+      "comment" : "Completes “Couldn't …”",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "найти аудиоустройство"
+          }
+        }
+      }
+    },
+    "https://api.example.com/v1" : {
+      "shouldTranslate" : false
+    },
+    "no details" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "без подробностей"
+          }
+        }
+      }
+    },
+    "start recording" : {
+      "comment" : "Completes “Couldn't …”",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "начать запись"
+          }
+        }
+      }
+    },
+    "−%@" : {
+      "shouldTranslate" : false
+    }
+  },
+  "version" : "1.0"
+}

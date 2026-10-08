@@ -132,7 +132,7 @@ enum IslandState: Equatable {
                 (recording, audio) = (kept.recording, kept.audio)
             } else {
                 guard await AVCaptureDevice.requestAccess(for: .audio) else {
-                    return show(.problem("Reprise needs microphone access"), for: .seconds(6))
+                    return show(.problem(String(localized: "Reprise needs microphone access")), for: .seconds(6))
                 }
                 recording = try store.create(app: app, at: .now)
                 audio = recorder(for: recording)
@@ -153,7 +153,7 @@ enum IslandState: Equatable {
                         let message = error.localizedDescription
                         Task { @MainActor in
                             log.error("The screen recording stopped: \(message, privacy: .public)")
-                            self?.show(.problem("Recording without the screen: \(message)"), for: .seconds(8))
+                            self?.show(.problem(String(localized: "Recording without the screen: \(message)")), for: .seconds(8))
                         }
                     }
                     do {
@@ -162,12 +162,12 @@ enum IslandState: Equatable {
                         recording.hasVideo = true
                     } catch {
                         try? FileManager.default.removeItem(at: recording.videoURL) // what the failed start left
-                        screenProblem = "Recording without the screen: \(error.localizedDescription)"
+                        screenProblem = String(localized: "Recording without the screen: \(error.localizedDescription)")
                     }
                 } else {
                     UserDefaults.standard.set(true, forKey: "screenAccessRequested") // Settings offers the relaunch
                     CGRequestScreenCaptureAccess()
-                    screenProblem = "Recording without the screen. Allow Screen Recording, then relaunch Reprise."
+                    screenProblem = String(localized: "Recording without the screen. Allow Screen Recording, then relaunch Reprise.")
                 }
             }
             session = Session(recording: recording, audio: audio, screen: screen)
@@ -207,11 +207,11 @@ enum IslandState: Equatable {
             let stalled = tick > 0 && now == written
             let diskFull = audio.isWaitingForDisk
             let problem = tick == 0 ? nil
-                : !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
-                : diskFull ? "The disk is full. Reprise keeps the call's sound until there's space."
-                : stalled && stalledBefore ? "The recording stopped getting sound. Check the microphone and the free disk space."
+                : !audio.hasHeardSound ? String(localized: "No sound is coming in. Check Privacy & Security.")
+                : diskFull ? String(localized: "The disk is full. Reprise keeps the call's sound until there's space.")
+                : stalled && stalledBefore ? String(localized: "The recording stopped getting sound. Check the microphone and the free disk space.")
                 // Three minutes in: a waiting room is silent too.
-                : tick >= 36 && session.recording.app != nil && !audio.hasHeardThem ? "No sound from the other side yet. Check System Audio Recording in Privacy & Security."
+                : tick >= 36 && session.recording.app != nil && !audio.hasHeardThem ? String(localized: "No sound from the other side yet. Check System Audio Recording in Privacy & Security.")
                 : nil
             if let problem, problem != shown {
                 log.notice("Warned: \(problem, privacy: .public)")
@@ -417,9 +417,9 @@ enum IslandState: Equatable {
         island = state
         // The panel never takes focus, so VoiceOver wouldn't notice it.
         let spoken: String? = switch state {
-        case .prompt(let app): "\(app.name): Record this call?"
+        case .prompt(let app): String(localized: "\(app.name): Record this call?")
         case .problem(let message): message
-        case .marked(let at): "Marked at \(at.clock)"
+        case .marked(let at): String(localized: "Marked at \(at.clock)")
         default: nil
         }
         if let spoken {
@@ -523,4 +523,7 @@ enum Shortcut {
 /// An error that is only its message.
 nonisolated struct Failure: LocalizedError {
     let errorDescription: String?
+
+    init(errorDescription: String?) { self.errorDescription = errorDescription }
+    init(_ message: LocalizedStringResource) { errorDescription = String(localized: message) }
 }

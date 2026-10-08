@@ -104,7 +104,7 @@ enum CalendarEvents {
                 id = "\(name) \(copy)"
             }
         }
-        let title = CalendarEvents.title(at: date) ?? app.map { "\($0.name) call" } ?? "Recording"
+        let title = CalendarEvents.title(at: date) ?? app.map { String(localized: "\($0.name) call") } ?? String(localized: "Recording")
         return Recording(id: id, title: title, app: app, startedAt: date, duration: 0, hasVideo: false)
     }
 

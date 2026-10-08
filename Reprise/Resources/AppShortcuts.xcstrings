@@ -1,0 +1,56 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Mark the call with ${applicationName}" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отметить звонок в ${applicationName}"
+          }
+        }
+      }
+    },
+    "Mark this moment with ${applicationName}" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отметить момент в ${applicationName}"
+          }
+        }
+      }
+    },
+    "Record a call with ${applicationName}" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записать звонок в ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start recording with ${applicationName}" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать запись в ${applicationName}"
+          }
+        }
+      }
+    },
+    "Stop recording with ${applicationName}" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить запись в ${applicationName}"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

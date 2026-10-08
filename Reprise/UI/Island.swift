@@ -413,7 +413,7 @@ struct VoiceDots: NSViewRepresentable {
             wantsLayer = true
             setAccessibilityElement(true)
             setAccessibilityRole(.image)
-            setAccessibilityLabel("Recording you and the other people")
+            setAccessibilityLabel(String(localized: "Recording you and the other people"))
             for (dot, (color, y)) in zip(dots, [(NSColor.white, 11.0), (.systemRed, 0)]) {
                 dot.frame = CGRect(x: 0, y: y, width: 7, height: 7)
                 dot.cornerRadius = 3.5

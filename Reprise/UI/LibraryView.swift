@@ -82,6 +82,13 @@ struct LibraryView: View {
         model.store.recordings.first { $0.id == model.selection }
     }
 
+    /// "Tuesday, October 6", capitalized as a heading in languages that write weekdays in lowercase.
+    private static let dayTitle = {
+        var style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide)
+        style.capitalizationContext = .beginningOfSentence
+        return style
+    }()
+
     private var sections: [(title: String, recordings: [Recording])] {
         let calendar = Calendar.current
         let matches = model.store.recordings.filter {
@@ -89,10 +96,10 @@ struct LibraryView: View {
         }
         let grouped = Dictionary(grouping: matches) { calendar.startOfDay(for: $0.startedAt) }
         return grouped.keys.sorted(by: >).map { day in
-            let title = calendar.isDateInToday(day) ? "Today"
-                : calendar.isDateInYesterday(day) ? "Yesterday"
-                : calendar.isDate(day, equalTo: .now, toGranularity: .year) ? day.formatted(.dateTime.weekday(.wide).day().month(.wide))
-                : day.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
+            let title = calendar.isDateInToday(day) ? String(localized: "Today")
+                : calendar.isDateInYesterday(day) ? String(localized: "Yesterday")
+                : calendar.isDate(day, equalTo: .now, toGranularity: .year) ? day.formatted(Self.dayTitle)
+                : day.formatted(Self.dayTitle.year())
             return (title, grouped[day]!)
         }
     }
@@ -254,7 +261,7 @@ private struct RecordingDetail: View {
                     .pointerStyle(.horizontalText) // reads as editable, like a name in Finder
                     .help("Click to rename")
                 }
-                Text([recording.app?.name ?? "Recording", recording.startedAt.formatted(date: .long, time: .shortened), model.isLive(recording) ? nil : recording.duration.clock].compactMap(\.self).joined(separator: " · "))
+                Text([recording.app?.name ?? String(localized: "Recording"), recording.startedAt.formatted(date: .long, time: .shortened), model.isLive(recording) ? nil : recording.duration.clock].compactMap(\.self).joined(separator: " · "))
                     .foregroundStyle(.secondary)
             }
         }

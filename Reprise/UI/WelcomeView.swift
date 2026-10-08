@@ -100,10 +100,10 @@ struct WelcomeView: View {
 private struct Step: View {
     let icon: String
     let tint: Color
-    let title: String
-    let detail: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
     let done: Bool
-    var actionTitle = "Allow"
+    var actionTitle: LocalizedStringKey = "Allow"
     let action: () async -> Void
 
     var body: some View {

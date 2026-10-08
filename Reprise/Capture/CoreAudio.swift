@@ -73,7 +73,7 @@ nonisolated extension AudioObjectID {
 struct CoreAudioError: LocalizedError {
     let action: String
     let status: OSStatus
-    var errorDescription: String? { "Couldn't \(action) (Core Audio error \(status))." }
+    var errorDescription: String? { String(localized: "Couldn't \(action) (Core Audio error \(status)).") }
 }
 
 nonisolated func check(_ action: String, _ status: OSStatus) throws {

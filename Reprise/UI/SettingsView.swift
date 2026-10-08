@@ -198,8 +198,8 @@ private struct UpdateRow: View {
 }
 
 struct PermissionRow: View {
-    let title: String
-    let detail: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
     let granted: Bool?
     let pane: String
     /// Asks macOS directly while it still can; once someone has answered, only System Settings changes it.

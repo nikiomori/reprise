@@ -55,14 +55,14 @@ import Security
         Task {
             do {
                 guard let zip = release.assets.first(where: { $0.name.hasSuffix(".zip") }) else {
-                    throw Failure(errorDescription: "This release has no app to download.")
+                    throw Failure("This release has no app to download.")
                 }
                 let folder = try await Self.download(zip.browser_download_url)
                 defer { try? FileManager.default.removeItem(at: folder) }
                 let app = folder.appending(path: "Reprise.app")
                 try await Task.detached { try Self.verify(app) }.value
                 // Relaunching would cut a call that started during the download short.
-                guard AppModel.shared.session == nil else { throw Failure(errorDescription: "Finish the recording, then install the update.") }
+                guard AppModel.shared.session == nil else { throw Failure("Finish the recording, then install the update.") }
                 _ = try FileManager.default.replaceItemAt(Bundle.main.bundleURL, withItemAt: app)
                 log.notice("Updated to \(release.version, privacy: .public), relaunching")
                 relaunch()
@@ -84,7 +84,7 @@ import Security
         defer { session.finishTasksAndInvalidate() }
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200 else { throw Failure(errorDescription: "GitHub answered \(status). Try again later.") }
+        guard status == 200 else { throw Failure("GitHub answered \(status). Try again later.") }
         return try JSONDecoder().decode(Release.self, from: data)
     }
 
@@ -93,7 +93,7 @@ import Security
     @concurrent private nonisolated static func download(_ url: URL) async throws -> URL {
         let (zip, response) = try await URLSession.shared.download(from: url)
         defer { try? FileManager.default.removeItem(at: zip) }
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure(errorDescription: "The download failed. Try again later.") }
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure("The download failed. Try again later.") }
         let folder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: Bundle.main.bundleURL, create: true)
         // ditto, not unzip: it puts the extended attributes back, which the signature covers.
         let ditto = Process()
@@ -101,7 +101,7 @@ import Security
         ditto.arguments = ["-x", "-k", zip.path, folder.path]
         try ditto.run()
         ditto.waitUntilExit()
-        guard ditto.terminationStatus == 0 else { throw Failure(errorDescription: "Couldn't unpack the update.") }
+        guard ditto.terminationStatus == 0 else { throw Failure("Couldn't unpack the update.") }
         return folder
     }
 
@@ -113,6 +113,6 @@ import Security
               SecCodeCopyDesignatedRequirement(current, [], &requirement) == errSecSuccess,
               SecStaticCodeCreateWithPath(app as CFURL, [], &update) == errSecSuccess, let update,
               SecStaticCodeCheckValidity(update, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode), requirement) == errSecSuccess
-        else { throw Failure(errorDescription: "The download doesn't have the signature of this copy of Reprise. Download the update from GitHub.") }
+        else { throw Failure("The download doesn't have the signature of this copy of Reprise. Download the update from GitHub.") }
     }
 }

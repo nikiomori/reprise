@@ -11,7 +11,7 @@ nonisolated struct TranscriptionService: Sendable {
         ("OpenAI", .init(baseURL: "https://api.openai.com/v1", model: "gpt-4o-transcribe")),
         ("Groq", .init(baseURL: "https://api.groq.com/openai/v1", model: "whisper-large-v3-turbo")),
         ("Mistral", .init(baseURL: "https://api.mistral.ai/v1", model: "voxtral-mini-latest")),
-        ("Local server", .init(baseURL: "http://localhost:8000/v1", model: "Systran/faster-whisper-large-v3")),
+        (String(localized: "Local server"), .init(baseURL: "http://localhost:8000/v1", model: "Systran/faster-whisper-large-v3")),
     ]
 }
 
@@ -63,7 +63,7 @@ nonisolated enum Transcriber {
             } else {
                 piece = FileManager.default.temporaryDirectory.appending(path: "reprise-\(UUID().uuidString).m4a")
                 guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
-                    throw Failure(errorDescription: "Couldn't prepare the audio for upload.")
+                    throw Failure("Couldn't prepare the audio for upload.")
                 }
                 export.timeRange = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
                                                duration: CMTime(seconds: min(chunk, duration - start), preferredTimescale: 600))
@@ -81,7 +81,7 @@ nonisolated enum Transcriber {
 
     private static func upload(_ file: URL, service: TranscriptionService, apiKey: String?, language: String?, prompt: String) async throws -> String {
         guard let url = URL(string: service.baseURL)?.appending(path: "audio/transcriptions") else {
-            throw Failure(errorDescription: "The server address isn't a valid URL.")
+            throw Failure("The server address isn't a valid URL.")
         }
         let boundary = "reprise-\(UUID().uuidString)"
         var request = URLRequest(url: url, timeoutInterval: 900)
@@ -106,7 +106,7 @@ nonisolated enum Transcriber {
         guard (200..<300).contains(status) else {
             let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error.message
                 ?? String(data: data, encoding: .utf8)?.prefix(300).description
-            throw Failure(errorDescription: "The service answered \(status): \(message ?? "no details").")
+            throw Failure("The service answered \(status): \(message ?? String(localized: "no details")).")
         }
         return try JSONDecoder().decode(TextBody.self, from: data).text
     }

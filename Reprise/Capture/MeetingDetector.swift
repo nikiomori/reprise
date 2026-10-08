@@ -36,9 +36,9 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         static func key(_ appID: String) -> String { "rule.\(appID)" }
         var title: String {
             switch self {
-            case .ask: "Ask"
-            case .always: "Always Record"
-            case .never: "Ignore"
+            case .ask: String(localized: "Ask")
+            case .always: String(localized: "Always Record")
+            case .never: String(localized: "Ignore")
             }
         }
     }

@@ -96,9 +96,9 @@ private struct RecordRow: View {
     }
 
     private var status: String {
-        if let session = model.session { return session.recording.app.map { "\($0.name) call" } ?? "Without a call" }
-        if let app = model.detector.active.first { return "Call in \(app.name)" }
-        return "Waiting for calls"
+        if let session = model.session { return session.recording.app.map { String(localized: "\($0.name) call") } ?? String(localized: "Without a call") }
+        if let app = model.detector.active.first { return String(localized: "Call in \(app.name)") }
+        return String(localized: "Waiting for calls")
     }
 }
 
@@ -109,9 +109,9 @@ private struct UpdateMenuRow: View {
 
     var body: some View {
         let (release, status): (Updater.Release?, String) = switch updater.state {
-        case .available(let release): (release, recording ? "After the recording" : "Installs and relaunches")
+        case .available(let release): (release, recording ? String(localized: "After the recording") : String(localized: "Installs and relaunches"))
         case .failed(let message, let release?): (release, message)
-        case .installing: (nil, "Reprise relaunches when it's done")
+        case .installing: (nil, String(localized: "Reprise relaunches when it's done"))
         default: (nil, "")
         }
         if release != nil || updater.state == .installing {

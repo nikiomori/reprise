@@ -151,7 +151,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         microphone = AudioObjectID.recordingMicrophone
         let main = microphone != .unknown ? microphone : AudioObjectID.defaultOutputDevice
         guard let mainUID = main.string(kAudioDevicePropertyDeviceUID) else {
-            throw CoreAudioError(action: "find an audio device", status: kAudioHardwareBadDeviceError)
+            throw CoreAudioError(action: String(localized: "find an audio device", comment: "Completes “Couldn't …”"), status: kAudioHardwareBadDeviceError)
         }
         micChannels = main.channelCount(scope: kAudioObjectPropertyScopeInput)
 
@@ -164,7 +164,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             tap.isProcessRestoreEnabled = true // an audio helper that restarts mid-call comes back
         }
         tap.isPrivate = true
-        try check("capture system audio", AudioHardwareCreateProcessTap(tap, &tapID))
+        try check(String(localized: "capture system audio", comment: "Completes “Couldn't …”"), AudioHardwareCreateProcessTap(tap, &tapID))
 
         let description: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Reprise Recorder",
@@ -177,7 +177,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: tap.uuid.uuidString, kAudioSubTapDriftCompensationKey: true]],
         ]
         do {
-            try check("create the recording device", AudioHardwareCreateAggregateDevice(description as CFDictionary, &deviceID))
+            try check(String(localized: "create the recording device", comment: "Completes “Couldn't …”"), AudioHardwareCreateAggregateDevice(description as CFDictionary, &deviceID))
 
             rate = deviceID.get(kAudioDevicePropertyNominalSampleRate, Float64(48_000))
             // An IO cycle every 40 ms instead of every 10: each one wakes Reprise up, and a
@@ -198,10 +198,10 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             converters = files.map { _ in resampling ? AVAudioConverter(from: format, to: fileFormat) : nil }
             resampled = files.map { _ in resampling ? AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(16_384 * fileFormat.sampleRate / rate) + 64) : nil }
 
-            try check("start recording", AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, inputTime, _, _ in
+            try check(String(localized: "start recording", comment: "Completes “Couldn't …”"), AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, inputTime, _, _ in
                 self?.write(input, at: inputTime.pointee.mHostTime)
             })
-            try check("start recording", AudioDeviceStart(deviceID, procID))
+            try check(String(localized: "start recording", comment: "Completes “Couldn't …”"), AudioDeviceStart(deviceID, procID))
             // A call app may switch the microphone to another rate mid-call. Written on at the old
             // one, the sound would play too fast or too slow.
             var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyNominalSampleRate, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
