@@ -23,6 +23,16 @@ nonisolated struct StopRecordingIntent: AppIntent {
     }
 }
 
+nonisolated struct MarkMomentIntent: AppIntent {
+    static let title: LocalizedStringResource = "Mark This Moment"
+    static let description = IntentDescription("Marks this moment of the call being recorded, to find it on the call's wave later.")
+
+    func perform() async throws -> some IntentResult {
+        await AppModel.shared.mark()
+        return .result()
+    }
+}
+
 nonisolated struct RepriseShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -36,6 +46,12 @@ nonisolated struct RepriseShortcuts: AppShortcutsProvider {
             phrases: ["Stop recording with \(.applicationName)"],
             shortTitle: "Stop Recording",
             systemImageName: "stop.circle"
+        )
+        AppShortcut(
+            intent: MarkMomentIntent(),
+            phrases: ["Mark this moment with \(.applicationName)", "Mark the call with \(.applicationName)"],
+            shortTitle: "Mark This Moment",
+            systemImageName: "flag"
         )
     }
 }

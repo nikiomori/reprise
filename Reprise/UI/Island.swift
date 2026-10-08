@@ -122,6 +122,12 @@ struct IslandView: View {
                         RecordingContent(model: model)
                     case .saved(let recording):
                         SavedContent(recording: recording)
+                    case .marked(let at):
+                        Label("Marked at \(at.clock)", systemImage: "flag.fill")
+                            .monospacedDigit()
+                            .font(.callout.weight(.medium))
+                            .padding(.horizontal, 16)
+                            .frame(height: 40)
                     case .problem(let message):
                         let label = Label(message, systemImage: "exclamationmark.triangle.fill")
                         // Long warnings wrap onto a second line rather than run past the panel's edges.
@@ -273,6 +279,14 @@ private struct RecordingContent: View {
             }
             .font(.system(.body, design: .rounded).weight(.semibold))
             if stoppable {
+                Button(action: model.mark) {
+                    Image(systemName: "flag.fill").font(.caption)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .help("Mark this moment")
+                .accessibilityLabel("Mark This Moment")
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
                 Button {
                     Task { await model.stopRecording() }
                 } label: {
@@ -302,6 +316,7 @@ private struct RecordingContent: View {
         #endif
         .contextMenu {
             if !saving {
+                Button("Mark This Moment", systemImage: "flag", action: model.mark)
                 Button("Stop Recording", systemImage: "stop.fill") { Task { await model.stopRecording() } }
                 Button("Hide Until the Call Ends", systemImage: "eye.slash") { model.hidePill() }
                 Divider()

@@ -15,6 +15,8 @@ struct Recording: Codable, Identifiable, Equatable {
     /// Seconds into the audio where the screen recording starts. The movie, recorded without sound,
     /// gets all of the audio, and its picture from there.
     var movieStart: TimeInterval?
+    /// Moments marked during the call, in seconds into the audio (and the movie, which has all of it).
+    var marks: [TimeInterval]?
 
     var folder: URL { RecordingStore.root.appending(path: id, directoryHint: .isDirectory) }
     var finalAudioURL: URL { folder.appending(path: "audio.m4a") }

@@ -72,6 +72,13 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     /// Host time when the sound at the file's time zero played, to line the screen recording up with it.
     var startHostTime: UInt64? { started.withLock { $0 }.map { $0 - AudioConvertNanosToHostTime(lead) } }
 
+    /// Seconds into the file of the sound playing now.
+    var position: TimeInterval? {
+        guard let start = startHostTime else { return nil }
+        let now = AudioGetCurrentHostTime()
+        return now > start ? Double(AudioConvertHostTimeToNanos(now - start)) / 1e9 : 0
+    }
+
     /// AAC-LC opens every file with this many frames of encoder delay, and the ADTS stream doesn't
     /// say so: every player puts the first recorded frame 44 ms (at 48 kHz) into the file.
     static let encoderDelay = 2112

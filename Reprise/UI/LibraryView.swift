@@ -196,7 +196,7 @@ private struct RecordingDetail: View {
                                 .clipShape(.rect(cornerRadius: 16))
                                 .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
                         }
-                        PlayerCard(player: player, waveformSource: recording.audioURL)
+                        PlayerCard(player: player, waveformSource: recording.audioURL, marks: recording.marks ?? [])
                             .tint(.primary)
                     }
                     TranscriptSection(recording: recording, model: model)
@@ -354,9 +354,13 @@ private struct LiveCard: View {
 private struct PlayerCard: View {
     let player: Player
     let waveformSource: URL
+    let marks: [TimeInterval]
 
     var body: some View {
         VStack(spacing: 10) {
+            if !marks.isEmpty, player.duration > 0 {
+                Marks(marks: marks, player: player)
+            }
             WaveformScrubber(player: player, source: waveformSource)
                 .frame(height: 64)
             // Elapsed and remaining under the wave, like Music and Voice Memos.
@@ -450,6 +454,29 @@ private struct WaveformScrubber: View {
             player.skip(direction == .increment ? 15 : -15)
         }
         .task { peaks = await Waveform.peaks(of: source, count: bars) }
+    }
+}
+
+/// Flags over the wave where moments were marked during the call. Each plays from a few seconds
+/// before its moment: the button is pressed after what's worth finding has begun.
+private struct Marks: View {
+    let marks: [TimeInterval]
+    let player: Player
+
+    var body: some View {
+        GeometryReader { geometry in
+            ForEach(marks, id: \.self) { mark in
+                Button { player.seek(to: max(0, mark - 5)) } label: {
+                    Image(systemName: "flag.fill").font(.caption2)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help(mark.clock)
+                .accessibilityLabel("Marker at \(mark.clock)")
+                .position(x: geometry.size.width * min(1, mark / player.duration), y: geometry.size.height / 2)
+            }
+        }
+        .frame(height: 14)
     }
 }
 

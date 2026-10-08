@@ -14,6 +14,8 @@ enum IslandState: Equatable {
     case recording
     case saved(Recording)
     case problem(String)
+    /// A moment of the call was marked, this many seconds in.
+    case marked(TimeInterval)
 }
 
 /// The app's brain: listens for calls, runs recordings, owns the library.
@@ -359,6 +361,16 @@ enum IslandState: Equatable {
         return (Double(AudioConvertHostTimeToNanos(movie)) - Double(AudioConvertHostTimeToNanos(audio))) / 1e9
     }
 
+    /// Marks this moment of the recording, to find it on the call's wave later.
+    func mark() {
+        guard let session else { return }
+        let at = session.audio.position ?? Date.now.timeIntervalSince(session.recording.startedAt)
+        self.session?.recording.marks = (session.recording.marks ?? []) + [at]
+        store.save(self.session!.recording) // kept even if Reprise quits mid-call
+        log.notice("Marked \(Int(at))s")
+        show(.marked(at), for: .seconds(1.5))
+    }
+
     /// Records the call Reprise is asking about, or the one going on; otherwise a recording without a call.
     func record() async {
         if case .prompt(let app) = island { await startRecording(app: app) } else { await startRecording(app: detector.active.first) }
@@ -403,6 +415,7 @@ enum IslandState: Equatable {
         let spoken: String? = switch state {
         case .prompt(let app): "\(app.name): Record this call?"
         case .problem(let message): message
+        case .marked(let at): "Marked at \(at.clock)"
         default: nil
         }
         if let spoken {

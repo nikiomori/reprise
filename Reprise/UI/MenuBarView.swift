@@ -23,6 +23,14 @@ struct MenuBarView: View {
             Toggle("Record the Screen", isOn: model.session.map { .constant($0.screen != nil) } ?? $model.recordScreen)
                 .toggleStyle(ChipToggleStyle(icon: "rectangle.inset.filled.badge.record"))
                 .disabled(model.session != nil)
+            if model.session != nil {
+                Button(action: model.mark) {
+                    HStack(spacing: 10) {
+                        Chip(icon: "flag")
+                        Text("Mark This Moment")
+                    }
+                }
+            }
             if model.session != nil, model.pillHidden {
                 Button(action: model.showPill) {
                     HStack(spacing: 10) {
