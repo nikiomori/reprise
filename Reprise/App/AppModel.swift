@@ -82,6 +82,7 @@ enum IslandState: Equatable {
                 await store.finalize(recording)
                 saving.remove(recording.id)
             }
+            store.trashOldScreens()
         }
     }
 
@@ -345,6 +346,7 @@ enum IslandState: Equatable {
         recording.movieStart = recording.movieStart ?? Self.movieStart(in: session)
         recording = await store.finalize(recording)
         saving.remove(recording.id) // with the save, so the library opens it as done, with its player
+        store.trashOldScreens()
         log.notice("Recording saved: \(recording.id, privacy: .public), \(Int(recording.duration))s")
         switch island {
         case .prompt: break // the next call's prompt still waits for an answer

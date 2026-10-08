@@ -32,6 +32,8 @@ private struct GeneralSettings: View {
     @AppStorage(CalendarEvents.key) private var calendarTitles = false
     @State private var calendars = CalendarEvents.isAllowed
     @AppStorage(Shortcut.key) private var shortcut = ""
+    @AppStorage(RecordingStore.keepScreenKey) private var keepScreenDays = 0
+    @State private var librarySize: Int64?
     @State private var shortcuts: [String] = []
     @AppStorage("screenAccessRequested") private var screenRequested = false
     @AppStorage("systemAudioHeard") private var systemAudioHeard = false
@@ -62,8 +64,20 @@ private struct GeneralSettings: View {
                     Button("Show in Finder") { AppModel.shared.store.revealInFinder() }
                 } label: {
                     Text("Saved in")
-                    Text(RecordingStore.root.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    let path = RecordingStore.root.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~")
+                    Text(librarySize.map { "\(path) · \($0.formatted(.byteCount(style: .file)))" } ?? path)
                 }
+                .task { librarySize = await RecordingStore.size(of: RecordingStore.root) }
+                Picker(selection: $keepScreenDays) {
+                    Text("Forever").tag(0)
+                    Text("3 Months").tag(90)
+                    Text("1 Month").tag(30)
+                    Text("1 Week").tag(7)
+                } label: {
+                    Text("Keep screen recordings")
+                    Text("Older ones go to the Trash. Their calls stay, with the sound.")
+                }
+                .onChange(of: keepScreenDays) { model.store.trashOldScreens() }
             }
             Section("Recording") {
                 Toggle(isOn: $recordFromStart) {

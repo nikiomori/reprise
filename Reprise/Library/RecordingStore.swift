@@ -221,6 +221,33 @@ enum CalendarEvents {
         _ = try FileManager.default.replaceItemAt(movie, withItemAt: temporary)
     }
 
+    /// Settings' "Keep screen recordings": days, or none for forever.
+    static let keepScreenKey = "keepScreenDays"
+
+    /// Moves the screen recordings of calls older than Settings keep them to the Trash. The calls
+    /// stay, with their sound: the movie takes most of a call's space.
+    func trashOldScreens() {
+        let days = UserDefaults.standard.integer(forKey: Self.keepScreenKey)
+        guard days > 0 else { return }
+        let cutoff = Date.now.addingTimeInterval(-Double(days) * 86_400)
+        for var recording in recordings where recording.startedAt < cutoff && FileManager.default.fileExists(atPath: recording.videoURL.path) {
+            guard (try? FileManager.default.trashItem(at: recording.videoURL, resultingItemURL: nil)) != nil else { continue }
+            log.notice("Moved the screen recording of \(recording.id, privacy: .public) to the Trash")
+            recording.hasVideo = false
+            save(recording)
+        }
+    }
+
+    /// The space the library takes on disk.
+    @concurrent static func size(of folder: URL) async -> Int64 {
+        let files = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.totalFileAllocatedSizeKey])
+        var total: Int64 = 0
+        while let file = files?.nextObject() as? URL {
+            total += Int64((try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0)
+        }
+        return total
+    }
+
     /// Moves the recording to the Trash, so it can be recovered. Returns where it is in the Trash.
     func delete(_ recording: Recording) -> URL? {
         var trashed: NSURL?
