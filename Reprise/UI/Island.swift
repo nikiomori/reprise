@@ -402,11 +402,23 @@ struct VoiceDots: NSViewRepresentable {
 
         required init?(coder: NSCoder) { fatalError() }
 
-        /// Ticks only while the dots are on screen.
+        /// Ticks only while the dots can be seen: a call recorded with the display asleep or the
+        /// screen locked ticked 15 times a second for nobody.
         override func viewDidMoveToWindow() {
-            timer?.invalidate()
-            timer = nil
-            guard window != nil else { return }
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
+            if let window {
+                NotificationCenter.default.addObserver(self, selector: #selector(follow), name: NSWindow.didChangeOcclusionStateNotification, object: window)
+            }
+            follow()
+        }
+
+        @objc private func follow() {
+            guard window?.occlusionState.contains(.visible) == true else {
+                timer?.invalidate()
+                timer = nil
+                return
+            }
+            guard timer == nil else { return }
             let timer = Timer(timeInterval: 1 / 15, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.show() }
             }
