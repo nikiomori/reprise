@@ -201,15 +201,20 @@ enum IslandState: Equatable {
             }
             let now = audio.framesWritten
             let stalled = tick > 0 && now == written
+            let diskFull = audio.isWaitingForDisk
             let problem = tick == 0 ? nil
                 : !audio.hasHeardSound ? "No sound is coming in. Check Privacy & Security."
+                : diskFull ? "The disk is full. Reprise keeps the call's sound until there's space."
                 : stalled && stalledBefore ? "The recording stopped getting sound. Check the microphone and the free disk space."
                 // Three minutes in: a waiting room is silent too.
                 : tick >= 36 && session.recording.app != nil && !audio.hasHeardThem ? "No sound from the other side yet. Check System Audio Recording in Privacy & Security."
                 : nil
-            if let problem, problem != shown { show(.problem(problem), for: .seconds(8)) }
+            if let problem, problem != shown {
+                log.notice("Warned: \(problem, privacy: .public)")
+                show(.problem(problem), for: .seconds(8))
+            }
             shown = problem
-            if stalled {
+            if stalled, !diskFull { // a new microphone wouldn't make room
                 log.notice("The recording stopped getting sound; restarting it on the current microphone")
                 do { try await Task.detached { try audio.restart() }.value } catch {
                     log.error("Restart failed: \(error.localizedDescription, privacy: .public)")

@@ -164,11 +164,11 @@ struct EncoderDelayTests {
     @Test func aacStartsLateByTheEncoderDelay() throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "reprise-delay-\(UUID()).aac")
         defer { try? FileManager.default.removeItem(at: url) }
-        let file = try AVAudioFile(forWriting: url, settings: AudioRecorder.fileSettings(rate: 48_000), commonFormat: .pcmFormatFloat32, interleaved: false)
-        let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!, frameCapacity: 96_000)!
+        let file = try ADTSWriter(url: url, rate: 48_000)
+        let buffer = AVAudioPCMBuffer(pcmFormat: file.format, frameCapacity: 96_000)!
         buffer.frameLength = 96_000
         for i in 48_000..<48_096 { buffer.floatChannelData![0][i] = 0.9 * sin(Float(i) * 2 * .pi / 24) } // 2 kHz
-        try file.write(from: buffer)
+        try file.encode(buffer)
         file.close()
 
         let back = try AVAudioFile(forReading: url)
@@ -176,6 +176,48 @@ struct EncoderDelayTests {
         try back.read(into: read)
         let onset = UnsafeBufferPointer(start: read.floatChannelData![0], count: Int(read.frameLength)).firstIndex { abs($0) > 0.2 }
         #expect(onset.map { abs($0 - (48_000 + AudioRecorder.encoderDelay)) < 24 } == true)
+    }
+
+    /// A microphone at another rate, resampled to the file's as it's recorded: 5 s in, 5 s in the file.
+    @Test func aMicrophoneAtAnotherRateKeepsItsLength() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-rate-\(UUID()).aac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let writer = try ADTSWriter(url: url, rate: 48_000)
+        let mic = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
+        let converter = AVAudioConverter(from: mic, to: writer.format)!
+        let cycle = AVAudioPCMBuffer(pcmFormat: mic, frameCapacity: 960)!
+        cycle.frameLength = 960
+        let resampled = AVAudioPCMBuffer(pcmFormat: writer.format, frameCapacity: 4096)!
+        for c in 0..<125 { // 40 ms each
+            for i in 0..<960 { cycle.floatChannelData![0][i] = 0.3 * sin(Float(c * 960 + i) * 0.1) }
+            try AudioRecorder.convert(cycle, with: converter, into: resampled)
+            try writer.encode(resampled)
+            _ = writer.writeIfDue()
+        }
+        writer.close()
+        let seconds = Double(try AVAudioFile(forReading: url).length) / 48_000
+        #expect(abs(seconds - 5) < 0.1)
+    }
+
+    /// The same bytes AVAudioFile writes, whatever the IO cycles' sizes and however often it writes.
+    @Test(arguments: [48_000.0, 44_100, 24_000])
+    func writesWhatAVAudioFileWrites(rate: Double) throws {
+        let ours = FileManager.default.temporaryDirectory.appending(path: "reprise-ours-\(UUID()).aac")
+        let theirs = FileManager.default.temporaryDirectory.appending(path: "reprise-theirs-\(UUID()).aac")
+        defer { [ours, theirs].forEach { try? FileManager.default.removeItem(at: $0) } }
+        let writer = try ADTSWriter(url: ours, rate: rate)
+        let file = try AVAudioFile(forWriting: theirs, settings: AudioRecorder.fileSettings(rate: rate), commonFormat: .pcmFormatFloat32, interleaved: false)
+        let cycle = AVAudioPCMBuffer(pcmFormat: writer.format, frameCapacity: 4096)!
+        for c in 0..<200 {
+            cycle.frameLength = [1920, 1764, 960, 4096, 37][c % 5]
+            for i in 0..<Int(cycle.frameLength) { cycle.floatChannelData![0][i] = 0.3 * sin(Float(c * 4096 + i) * 0.02) }
+            try writer.encode(cycle)
+            _ = writer.writeIfDue()
+            try file.write(from: cycle)
+        }
+        writer.close()
+        file.close()
+        #expect(try Data(contentsOf: ours) == Data(contentsOf: theirs))
     }
 }
 

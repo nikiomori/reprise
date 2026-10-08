@@ -7,7 +7,7 @@ import Synchronization
 ///
 /// A private aggregate device combines the default input device with a system-wide
 /// Core Audio process tap, so both sources share one clock (the tap is drift-compensated).
-/// Each IO cycle is mixed down to mono and appended to the file.
+/// Each IO cycle is mixed down to mono; the file gets the sound half a second at a time.
 nonisolated final class AudioRecorder: @unchecked Sendable {
     private let url: URL
     private let processes: [AudioObjectID]
@@ -20,7 +20,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private var microphone = AudioObjectID.unknown
     private var followingMicrophone: AudioObjectPropertyListenerBlock?
     private var procID: AudioDeviceIOProcID?
-    private var file: AVAudioFile?
+    private var file: ADTSWriter?
     private var mix: AVAudioPCMBuffer?
     /// Brings a microphone's sound to the file's rate, when it runs at another one.
     private var converter: AVAudioConverter?
@@ -33,6 +33,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let heard = Mutex(false)
     private let heardThem = Mutex(false)
     private let written = Mutex(0)
+    private let waitingForDisk = Mutex(false)
     private let started = Mutex<UInt64?>(nil)
     private var lead: UInt64 = 0 // nanoseconds
 
@@ -50,6 +51,9 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
 
     /// Frames that made it into the file. Stuck while the device is gone or the disk is full.
     var framesWritten: Int { written.withLock { $0 } }
+
+    /// The disk is full: the sound waits in memory, and goes into the file once there's space.
+    var isWaitingForDisk: Bool { waitingForDisk.withLock { $0 } }
 
     /// Host time when the sound at the file's time zero played, to line the screen recording up with it.
     var startHostTime: UInt64? { started.withLock { $0 }.map { $0 - AudioConvertNanosToHostTime(lead) } }
@@ -160,10 +164,10 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
                 // the Mac's sound late (2399 frames, 50 ms, on a MacBook), and then comes the encoder delay.
                 let tapLatency = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
                 lead = UInt64(Double(Int(tapLatency) + Self.encoderDelay) / rate * 1e9)
-                file = try AVAudioFile(forWriting: url, settings: Self.fileSettings(rate: rate), commonFormat: .pcmFormatFloat32, interleaved: false)
+                file = try ADTSWriter(url: url, rate: rate)
             }
             let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
-            let fileFormat = file!.processingFormat
+            let fileFormat = file!.format
             mix = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 16_384)
             converter = rate == fileFormat.sampleRate ? nil : AVAudioConverter(from: format, to: fileFormat)
             resampled = converter == nil ? nil : AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(16_384 * fileFormat.sampleRate / rate) + 64)
@@ -218,13 +222,18 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         guard (try? append(mix, to: file)) != nil else { return }
         end = hostTime + AudioConvertNanosToHostTime(UInt64(Double(frames) / rate * 1e9))
         started.withLock { $0 = $0 ?? hostTime }
-        written.withLock { $0 += frames }
     }
 
-    private func append(_ buffer: AVAudioPCMBuffer, to file: AVAudioFile) throws {
-        guard let converter, let resampled else { return try file.write(from: buffer) }
-        try Self.convert(buffer, with: converter, into: resampled)
-        try file.write(from: resampled)
+    private func append(_ buffer: AVAudioPCMBuffer, to file: ADTSWriter) throws {
+        var buffer = buffer
+        if let converter, let resampled {
+            try Self.convert(buffer, with: converter, into: resampled)
+            buffer = resampled
+        }
+        try file.encode(buffer)
+        guard file.writeIfDue() else { return }
+        written.withLock { $0 = file.written }
+        waitingForDisk.withLock { $0 = file.isWaitingForDisk }
     }
 
     /// One IO cycle through a converter that keeps its state for the next one.
@@ -240,13 +249,13 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     }
 
     /// Gaps under 10 ms are the clocks' jitter, not lost sound.
-    private func writeSilence(_ seconds: Double, to file: AVAudioFile) {
-        guard seconds > 0.01, let silence = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 48_000) else { return }
+    private func writeSilence(_ seconds: Double, to file: ADTSWriter) {
+        guard seconds > 0.01, let silence = AVAudioPCMBuffer(pcmFormat: file.format, frameCapacity: 48_000) else { return }
         silence.floatChannelData![0].update(repeating: 0, count: Int(silence.frameCapacity))
-        var left = AVAudioFrameCount(seconds * file.processingFormat.sampleRate)
+        var left = AVAudioFrameCount(seconds * file.format.sampleRate)
         while left > 0 {
             silence.frameLength = min(left, silence.frameCapacity)
-            guard (try? file.write(from: silence)) != nil else { return }
+            guard (try? file.encode(silence)) != nil else { return }
             left -= silence.frameLength
         }
     }
@@ -286,5 +295,95 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         }
         for f in 0..<frames { out[f] = min(1, max(-1, out[f])) }
         return (frames, you, them)
+    }
+}
+
+/// The recording's sound as an ADTS stream, AAC packets each behind a 7-byte header, appended to
+/// the file: it plays however the recording ends. The bytes AVAudioFile writes, but kept while the
+/// disk is full and written once there's space again. AVAudioFile failed for good at the first
+/// write that didn't fit, and the rest of the call was lost even after space was freed.
+nonisolated final class ADTSWriter {
+    /// What it encodes: mono Float32 at the file's rate.
+    let format: AVAudioFormat
+    private let encoder: AVAudioConverter
+    private let packets: AVAudioCompressedBuffer
+    private let handle: FileHandle
+    /// MPEG-2 ID, no CRC, AAC LC at the rate's index, one channel, "original": as AVAudioFile writes it.
+    private let header: [UInt8]
+    private var unwritten = Data()
+    private var encoded = 0
+    private var tried = 0
+    /// Frames in the file.
+    private(set) var written = 0
+    /// The last write didn't fit: the sound waits in memory.
+    private(set) var isWaitingForDisk = false
+
+    init(url: URL, rate: Double) throws {
+        format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
+        guard let index = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350].firstIndex(of: Int(rate)),
+              let aac = AVAudioFormat(settings: AudioRecorder.fileSettings(rate: rate)),
+              let encoder = AVAudioConverter(from: format, to: aac) else { throw CocoaError(.featureUnsupported) }
+        self.encoder = encoder
+        packets = AVAudioCompressedBuffer(format: aac, packetCapacity: 32, maximumPacketSize: max(encoder.maximumOutputPacketSize, 1))
+        header = [0xFF, 0xF9, UInt8(1 << 6 | index << 2), 0x60]
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+        handle = try FileHandle(forWritingTo: url)
+    }
+
+    /// `nil`: the end, which gives out the encoder's last samples.
+    func encode(_ buffer: AVAudioPCMBuffer?) throws {
+        nonisolated(unsafe) var given = false
+        var status = AVAudioConverterOutputStatus.haveData
+        while status == .haveData {
+            var failure: NSError?
+            status = encoder.convert(to: packets, error: &failure) { _, state in
+                guard let buffer, !given else {
+                    state.pointee = buffer == nil ? .endOfStream : .noDataNow
+                    return nil
+                }
+                given = true
+                state.pointee = .haveData
+                return buffer
+            }
+            guard status != .error else { throw failure ?? CocoaError(.fileWriteUnknown) }
+            for packet in UnsafeBufferPointer(start: packets.packetDescriptions, count: Int(packets.packetCount)) {
+                let length = 7 + Int(packet.mDataByteSize)
+                unwritten.append(contentsOf: header[0..<3])
+                unwritten.append(contentsOf: [header[3] | UInt8(length >> 11), UInt8(length >> 3 & 0xFF), UInt8((length & 7) << 5), 0])
+                unwritten.append(packets.data.advanced(by: Int(packet.mStartOffset)).assumingMemoryBound(to: UInt8.self), count: Int(packet.mDataByteSize))
+            }
+        }
+        encoded += Int(buffer?.frameLength ?? 0)
+    }
+
+    /// Writes once half a second has been encoded since the last try. Written every IO cycle, each
+    /// packet went to the disk on its own: a quarter of the recording's CPU. A crash loses at most
+    /// this much. True when it tried.
+    func writeIfDue() -> Bool {
+        guard encoded - tried >= Int(format.sampleRate / 2) else { return false }
+        write()
+        return true
+    }
+
+    /// Cut back when it doesn't fit, so no packet is left half written.
+    private func write() {
+        tried = encoded
+        guard !unwritten.isEmpty, let start = try? handle.offset() else { return }
+        do {
+            try handle.write(contentsOf: unwritten)
+            unwritten.removeAll(keepingCapacity: unwritten.count < 1 << 16) // not a full disk's backlog
+            written = encoded
+            isWaitingForDisk = false
+        } catch {
+            try? handle.truncate(atOffset: start)
+            isWaitingForDisk = true
+        }
+    }
+
+    /// What the encoder holds back, then all that's left, whatever fails on the way.
+    func close() {
+        try? encode(nil)
+        write()
+        try? handle.close()
     }
 }
