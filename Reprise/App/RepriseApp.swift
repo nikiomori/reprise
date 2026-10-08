@@ -77,13 +77,12 @@ private struct RecordingCommands: Commands {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var island: IslandPanel?
     private let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = AppModel.shared
         _ = Updater.shared
-        island = IslandPanel()
+        IslandPanel.start()
         log.notice("Launched. Microphone: \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue), screen: \(CGPreflightScreenCaptureAccess())")
         // `kill` and friends go through the normal quit, so a recording in progress gets saved.
         signal(SIGTERM, SIG_IGN)

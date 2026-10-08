@@ -36,8 +36,6 @@ enum DebugSnapshots {
 
     // MARK: Island
 
-    private static var island: NSWindow? { NSApp.windows.first { $0 is IslandPanel } }
-
     /// A clean gradient "desktop" behind the island, so no real wallpaper or menu bar leaks in.
     private static func backdrop(around frame: CGRect, dark: Bool) -> NSWindow {
         let window = NSWindow(contentRect: frame.insetBy(dx: -40, dy: -40), styleMask: .borderless, backing: .buffered, defer: false)
@@ -51,9 +49,8 @@ enum DebugSnapshots {
     }
 
     private static func islandStills(_ dir: URL, _ suffix: String) async {
-        guard let island else { return }
-        island.sharingType = .readOnly
-        let backdrop = backdrop(around: island.frame, dark: suffix == "dark")
+        guard let frame = IslandPanel.frame else { return }
+        let backdrop = backdrop(around: frame, dark: suffix == "dark")
         defer { backdrop.close() }
         let model = AppModel.shared
         var states: [(String, IslandState)] = [
@@ -64,7 +61,7 @@ enum DebugSnapshots {
         for (name, state) in states {
             model.debugShow(state)
             try? await Task.sleep(for: .seconds(name == "recording" ? 3.5 : 1.5)) // let the pill expand
-            await capture(rect: island.frame, dir, "island-\(name)-\(suffix)")
+            await capture(rect: frame, dir, "island-\(name)-\(suffix)")
         }
         model.debugShow(.hidden)
         try? await Task.sleep(for: .seconds(0.8))
@@ -72,15 +69,13 @@ enum DebugSnapshots {
 
     /// The whole story in one take: call detected → recording → saved.
     private static func islandVideo(_ dir: URL) async {
-        guard let island, let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
+        guard let rect = IslandPanel.frame, let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
               let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() }) else { return }
         NSApp.appearance = NSAppearance(named: .darkAqua)
-        island.sharingType = .readOnly
-        let backdrop = backdrop(around: island.frame, dark: true)
+        let backdrop = backdrop(around: rect, dark: true)
         defer { backdrop.close() }
 
         let height = NSScreen.screens[0].frame.height
-        let rect = island.frame
         let config = SCStreamConfiguration()
         config.sourceRect = CGRect(x: rect.minX, y: height - rect.maxY, width: rect.width, height: rect.height)
         config.width = Int(rect.width * 2)

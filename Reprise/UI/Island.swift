@@ -2,13 +2,53 @@ import SwiftUI
 
 /// A borderless, click-through-when-empty panel under the menu bar — home of the
 /// Dynamic Island–style capsule. Drag the capsule anywhere; the spot is remembered.
-final class IslandPanel: NSPanel {
+///
+/// Made each time the island shows, and closed once it's hidden: a window that has been on
+/// screen, even ordered out, kept 0.6 MB, and the window server's notifications woke Reprise up
+/// between calls. The capsule's view outlives the panels, so it animates in and out as before.
+final class IslandPanel: NSPanel, NSWindowDelegate {
     private static let originKey = "islandOrigin"
 
     static let size = CGSize(width: 520, height: 120)
 
-    init() {
-        super.init(contentRect: CGRect(origin: .zero, size: Self.size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    private static let content = NSHostingView(rootView: IslandView(model: .shared))
+    private static var shown: IslandPanel?
+
+    static func start() {
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { shown?.reposition() }
+        }
+        NotificationCenter.default.addObserver(forName: .resetIslandPosition, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                UserDefaults.standard.removeObject(forKey: originKey)
+                shown?.reposition()
+            }
+        }
+        followIsland()
+    }
+
+    /// Only while there's something to show: nothing for the window server to composite.
+    /// Never touch `ignoresMouseEvents`: once set (even to false), the clear parts of the
+    /// panel stop letting clicks through to the windows below.
+    private static func followIsland() {
+        if AppModel.shared.island == .hidden {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { // after the exit animation
+                guard AppModel.shared.island == .hidden else { return }
+                shown?.close()
+                shown = nil
+            }
+        } else {
+            if shown == nil { shown = IslandPanel() }
+            shown?.orderFrontRegardless()
+        }
+        withObservationTracking { _ = AppModel.shared.island } onChange: {
+            Task { @MainActor in followIsland() }
+        }
+    }
+
+    private init() {
+        super.init(contentRect: CGRect(origin: .zero, size: Self.size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        isReleasedWhenClosed = false // ARC owns it; close() must not release it again
         isFloatingPanel = true
         level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -17,62 +57,44 @@ final class IslandPanel: NSPanel {
         hasShadow = false
         hidesOnDeactivate = false
         sharingType = .none // keep the island out of screen shares and recordings
-        contentView = NSHostingView(rootView: IslandView(model: .shared))
+        #if DEBUG
+        if DebugSnapshots.isRunning { sharingType = .readOnly } // but not out of the snapshot studio's
+        #endif
+        contentView = Self.content
         isMovableByWindowBackground = true
+        delegate = self
         reposition()
-        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reposition() }
-        }
-        NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: self, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.frame.origin != self.placed else { return } // only a drag picks a spot
-                UserDefaults.standard.set(NSStringFromPoint(self.frame.origin), forKey: Self.originKey)
-            }
-        }
-        NotificationCenter.default.addObserver(forName: .resetIslandPosition, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                UserDefaults.standard.removeObject(forKey: Self.originKey)
-                self?.reposition()
-            }
-        }
-        orderFrontRegardless()
-        followIsland()
     }
 
     override var canBecomeKey: Bool { false }
 
-    /// Off screen while there's nothing to show: nothing for the window server to composite.
-    /// Never touch `ignoresMouseEvents`: once set (even to false), the clear parts of the
-    /// panel stop letting clicks through to the windows below.
-    private func followIsland() {
-        if AppModel.shared.island == .hidden {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in // after the exit animation
-                if AppModel.shared.island == .hidden { self?.orderOut(nil) }
-            }
-        } else {
-            orderFrontRegardless()
-        }
-        withObservationTracking { _ = AppModel.shared.island } onChange: { [weak self] in
-            Task { @MainActor in self?.followIsland() }
-        }
+    func windowDidMove(_ notification: Notification) {
+        if frame.origin != placed { UserDefaults.standard.set(NSStringFromPoint(frame.origin), forKey: Self.originKey) } // only a drag picks a spot
     }
 
     /// Where Reprise itself last put the panel. `setFrameOrigin` posts `didMove` too, and
     /// remembering those spots would pin the island off-center after a display change.
     private var placed = CGPoint.zero
 
-    /// The remembered spot if it's still on a screen, otherwise centered under the menu bar.
     private func reposition() {
-        if let saved = UserDefaults.standard.string(forKey: Self.originKey).map(NSPointFromString),
-           NSScreen.screens.contains(where: { $0.visibleFrame.intersects(CGRect(origin: saved, size: Self.size)) }) {
-            placed = saved
-        } else if let screen = NSScreen.screens.first {
-            placed = CGPoint(x: (screen.frame.midX - Self.size.width / 2).rounded(), y: (screen.visibleFrame.maxY - Self.size.height).rounded())
-        } else {
-            return
-        }
-        setFrameOrigin(placed)
+        guard let origin = Self.origin() else { return }
+        placed = origin
+        setFrameOrigin(origin)
     }
+
+    /// The remembered spot if it's still on a screen, otherwise centered under the menu bar.
+    private static func origin() -> CGPoint? {
+        if let saved = UserDefaults.standard.string(forKey: originKey).map(NSPointFromString),
+           NSScreen.screens.contains(where: { $0.visibleFrame.intersects(CGRect(origin: saved, size: size)) }) {
+            return saved
+        }
+        return NSScreen.screens.first.map { CGPoint(x: ($0.frame.midX - size.width / 2).rounded(), y: ($0.visibleFrame.maxY - size.height).rounded()) }
+    }
+
+    #if DEBUG
+    /// Where the island shows, for the snapshot studio to film it from before it does.
+    static var frame: CGRect? { origin().map { CGRect(origin: $0, size: size) } }
+    #endif
 }
 
 extension Notification.Name {
@@ -81,14 +103,17 @@ extension Notification.Name {
 
 struct IslandView: View {
     let model: AppModel
+    /// The model's state a moment later. A new panel draws the island hidden first, so it animates
+    /// in: the view put in a panel made for a state already set showed it at once, without the spring.
+    @State private var island = IslandState.hidden
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // One capsule whose size springs between states while its content cross-blurs.
         ZStack {
-            if model.island != .hidden {
+            if island != .hidden {
                 ZStack {
-                    switch model.island {
+                    switch island {
                     case .hidden:
                         EmptyView()
                     case .prompt(let app):
@@ -121,7 +146,8 @@ struct IslandView: View {
         }
         .padding(.top, 8)
         .frame(width: IslandPanel.size.width, height: IslandPanel.size.height, alignment: .top)
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.5, bounce: 0.28), value: model.island)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.5, bounce: 0.28), value: island)
+        .task(id: model.island) { island = model.island }
         .environment(\.colorScheme, .dark)
         .environment(\.controlActiveState, .key) // the panel never becomes key; don't draw it dimmed
     }
