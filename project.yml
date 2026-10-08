@@ -40,10 +40,12 @@ targets:
         NSHumanReadableCopyright: MIT License
         NSMicrophoneUsageDescription: Reprise records your voice during the calls you choose to record.
         NSAudioCaptureUsageDescription: Reprise records what the other people on the call say.
+        NSCalendarsFullAccessUsageDescription: Reprise names each call after the calendar event it belongs to.
     entitlements:
       path: Reprise/Resources/Reprise.entitlements
       properties:
         com.apple.security.device.audio-input: true
+        com.apple.security.personal-information.calendars: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.nikiomori.reprise

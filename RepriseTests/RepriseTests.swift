@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreAudio
+import EventKit
 import Testing
 @testable import Reprise
 
@@ -356,5 +357,32 @@ struct UpdaterTests {
         await writer.finishWriting()
         store.save(recording)
         return recording
+    }
+}
+
+@MainActor struct CalendarEventsTests {
+    private let store = EKEventStore()
+
+    private func event(_ title: String, from start: TimeInterval, to end: TimeInterval, allDay: Bool = false) -> EKEvent {
+        let event = EKEvent(eventStore: store)
+        event.title = title
+        event.startDate = .init(timeIntervalSinceReferenceDate: start * 60)
+        event.endDate = .init(timeIntervalSinceReferenceDate: end * 60)
+        event.isAllDay = allDay
+        return event
+    }
+
+    /// The call starts at minute `at`.
+    private func title(at minute: TimeInterval, _ events: [EKEvent]) -> String? {
+        CalendarEvents.event(at: .init(timeIntervalSinceReferenceDate: minute * 60), among: events)?.title
+    }
+
+    @Test func picksTheEventGoingOnOrAboutToStart() {
+        let standup = event("Standup", from: 600, to: 615), review = event("Review", from: 660, to: 720)
+        let day = event("Offsite", from: 0, to: 1440, allDay: true)
+        #expect(title(at: 605, [day, standup, review]) == "Standup")
+        #expect(title(at: 652, [day, standup, review]) == "Review") // joined 8 minutes early
+        #expect(title(at: 630, [day, standup, review]) == nil) // between them; never the all-day one
+        #expect(title(at: 714, [event("Long", from: 540, to: 780), review]) == "Review") // the one that began last
     }
 }

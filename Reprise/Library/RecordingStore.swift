@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import EventKit
 
 /// One recorded call. Lives in its own folder:
 /// `~/Movies/Reprise/<id>/{recording.json, audio.m4a, you.m4a, them.m4a, screen.mov, transcript.txt}`
@@ -33,6 +34,34 @@ struct Recording: Codable, Identifiable, Equatable {
     // folder (3 days unused). Clear this folder for calls gone at reload if that's too late.
     /// The clones Share and dragging out hand over under the title. Trashing the call removes them.
     var copiesFolder: URL { FileManager.default.temporaryDirectory.appending(path: "reprise-calls/\(id)", directoryHint: .isDirectory) }
+}
+
+/// Names a call after the calendar event it belongs to, when Settings ask for it.
+enum CalendarEvents {
+    static let key = "calendarTitles"
+    /// Made on first use: with the setting off, Reprise never talks to the calendar.
+    private static let store = EKEventStore()
+
+    static var isAllowed: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+
+    static func requestAccess() async -> Bool { (try? await store.requestFullAccessToEvents()) ?? false }
+
+    static func title(at date: Date) -> String? {
+        guard UserDefaults.standard.bool(forKey: key), isAllowed else { return nil }
+        let events = store.events(matching: store.predicateForEvents(withStart: date.addingTimeInterval(-12 * 3600), end: date + early, calendars: nil))
+        return event(at: date, among: events)?.title.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// A call joined a few minutes early belongs to the event about to start.
+    private static let early: TimeInterval = 10 * 60
+
+    /// The event going on at `date`, or about to start: the one whose start is nearest. Not all-day
+    /// ones, and not those you declined.
+    static func event(at date: Date, among events: [EKEvent]) -> EKEvent? {
+        events
+            .filter { !$0.isAllDay && $0.startDate <= date + early && $0.endDate > date && $0.attendees?.first(where: \.isCurrentUser)?.participantStatus != .declined }
+            .min { abs($0.startDate.timeIntervalSince(date)) < abs($1.startDate.timeIntervalSince(date)) }
+    }
 }
 
 @Observable final class RecordingStore {
@@ -75,7 +104,8 @@ struct Recording: Codable, Identifiable, Equatable {
                 id = "\(name) \(copy)"
             }
         }
-        return Recording(id: id, title: app.map { "\($0.name) call" } ?? "Recording", app: app, startedAt: date, duration: 0, hasVideo: false)
+        let title = CalendarEvents.title(at: date) ?? app.map { "\($0.name) call" } ?? "Recording"
+        return Recording(id: id, title: title, app: app, startedAt: date, duration: 0, hasVideo: false)
     }
 
     func transcript(of recording: Recording) -> String? {

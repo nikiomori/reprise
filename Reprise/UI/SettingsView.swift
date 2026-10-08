@@ -29,6 +29,8 @@ private struct GeneralSettings: View {
     @AppStorage("recordFromStart") private var recordFromStart = false
     @AppStorage("callAppAudioOnly") private var callAppAudioOnly = false
     @AppStorage("separateTracks") private var separateTracks = false
+    @AppStorage(CalendarEvents.key) private var calendarTitles = false
+    @State private var calendars = CalendarEvents.isAllowed
     @AppStorage("screenAccessRequested") private var screenRequested = false
     @AppStorage("systemAudioHeard") private var systemAudioHeard = false
     @AppStorage(Updater.autoKey) private var checkForUpdates = true
@@ -74,6 +76,15 @@ private struct GeneralSettings: View {
                     Text("Also save each side in its own file")
                     Text("You and the others, as you.m4a and them.m4a next to the call, to edit a podcast or an interview. Takes a little more power and disk space.")
                 }
+                Toggle(isOn: Binding {
+                    calendarTitles
+                } set: { on in
+                    calendarTitles = on
+                    if on { Task { calendars = await CalendarEvents.requestAccess() } }
+                }) {
+                    Text("Name calls after calendar events")
+                    Text("A call gets the title of the event going on when it starts.")
+                }
                 Toggle("Record the screen by default", isOn: $model.recordScreen)
                 Toggle("Show the floating pill while recording", isOn: $showPill)
             }
@@ -91,6 +102,9 @@ private struct GeneralSettings: View {
                                   screenRequested = true
                                   CGRequestScreenCaptureAccess()
                               })
+                if calendarTitles {
+                    PermissionRow(title: "Calendars", detail: "To name calls after their events", granted: calendars, pane: "Privacy_Calendars")
+                }
                 if !screen, screenRequested {
                     LabeledContent("Already switched it on?") {
                         Button("Relaunch Reprise", action: relaunch)
@@ -107,6 +121,7 @@ private struct GeneralSettings: View {
             loginItem = SMAppService.mainApp.status
             microphone = AVCaptureDevice.authorizationStatus(for: .audio)
             screen = ScreenRecorder.hasPermission
+            calendars = CalendarEvents.isAllowed
         }
     }
 }

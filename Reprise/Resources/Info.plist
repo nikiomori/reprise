@@ -24,6 +24,8 @@
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Reprise records what the other people on the call say.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Reprise names each call after the calendar event it belongs to.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 	<key>NSMicrophoneUsageDescription</key>
