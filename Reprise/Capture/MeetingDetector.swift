@@ -106,18 +106,21 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
 /// Watches which apps are using the microphone and reports when a call starts or ends.
 @Observable final class MeetingDetector {
     private(set) var active: Set<MeetingApp> = []
-    var onStart: (MeetingApp) -> Void = { _ in }
-    var onEnd: (MeetingApp) -> Void = { _ in }
+    // The rest changes on every tick of a call, and no view reads it: kept out of observation.
+    @ObservationIgnored var onStart: (MeetingApp) -> Void = { _ in }
+    @ObservationIgnored var onEnd: (MeetingApp) -> Void = { _ in }
 
-    private var firstSeen: [MeetingApp: Date] = [:]
-    private var lastSeen: [MeetingApp: Date] = [:]
-    private var timer: Timer?
-    private var watched: Set<AudioObjectID> = []
+    @ObservationIgnored private var firstSeen: [MeetingApp: Date] = [:]
+    @ObservationIgnored private var lastSeen: [MeetingApp: Date] = [:]
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var watched: Set<AudioObjectID> = []
+    /// Input devices: while none of them runs, no app has a microphone open.
+    @ObservationIgnored private var microphones: Set<AudioObjectID> = []
     /// Processes with audio going on, kept by their `IsRunning` notifications. A tick asks Core
     /// Audio about these few instead of every audio process: ~35 round trips took 10 ms.
-    private var running: Set<AudioObjectID> = []
+    @ObservationIgnored private var running: Set<AudioObjectID> = []
     /// The app of each running process: finding it takes round trips and LaunchServices.
-    private var apps: [AudioObjectID: MeetingApp?] = [:]
+    @ObservationIgnored private var apps: [AudioObjectID: MeetingApp?] = [:]
 
     // ponytail: two fixed values; per-app tuning if some app's calls end with a long tail.
     /// How long an app may keep playing sound with the mic closed before its call counts as over.
@@ -148,12 +151,14 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         let devices = AudioObjectID.system.ids(kAudioHardwarePropertyDevices)
         watched.formIntersection(processes + devices) // gone objects take their listeners with them
         running.formIntersection(processes)
+        microphones.formIntersection(devices)
         for process in processes where watched.insert(process).inserted {
             listen(process, kAudioProcessPropertyIsRunning)
             recheck(process) // it may be playing already
         }
         // Output devices go into `watched` too, so their channels are only counted once.
         for device in devices where watched.insert(device).inserted && device.channelCount(scope: kAudioObjectPropertyScopeInput) > 0 {
+            microphones.insert(device)
             listen(device, kAudioDevicePropertyDeviceIsRunningSomewhere)
         }
         return processes
@@ -184,7 +189,10 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         // The lists notify when they change; a call's timer ticks are only for the delays.
         let processes = changed == nil && !firstSeen.isEmpty ? [] : watchNewObjects()
         if changed == nil, firstSeen.isEmpty {
-            processes.forEach(recheck) // between calls, the timer goes over all, in case a notification got lost
+            // Between calls, the timer goes over all, in case a notification got lost. Only with a
+            // microphone open: without one there's no call to find, and each process is a round trip.
+            guard microphones.contains(where: { $0.get(kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) != 0 }) else { return }
+            processes.forEach(recheck)
         } else {
             running.forEach(recheck) // a process that stops notifies too, but nothing depends on it
             if let changed, processes.contains(changed) { recheck(changed) }
