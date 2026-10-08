@@ -353,11 +353,22 @@ private struct SavedContent: View {
 /// frame rate for half of every second: 7% CPU for the whole call.
 struct ElapsedTime: View {
     let since: Date
+    /// SwiftUI keeps a closed window's views, and their timelines go on: a library closed during a
+    /// call kept ticking its clock until the call ended.
+    @State private var onScreen = true
 
     var body: some View {
-        TimelineView(.periodic(from: since, by: 1)) { context in
-            Text(context.date.timeIntervalSince(since).clock).monospacedDigit()
+        Group {
+            if onScreen {
+                TimelineView(.periodic(from: since, by: 1)) { context in
+                    Text(context.date.timeIntervalSince(since).clock).monospacedDigit()
+                }
+            } else {
+                Text(Date.now.timeIntervalSince(since).clock).monospacedDigit()
+            }
         }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
     }
 }
 
