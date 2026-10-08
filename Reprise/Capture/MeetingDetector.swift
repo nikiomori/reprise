@@ -257,13 +257,15 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter { Self.app(of: $0) == app }
     }
 
-    /// None for Reprise itself.
+    /// None for Reprise itself, another copy included: a development build recording next to the
+    /// app was offered as a call, and listed in Settings among the other apps.
     private static func app(of process: AudioObjectID) -> MeetingApp? {
         let pid = process.get(kAudioProcessPropertyPID, pid_t(-1))
         guard pid != getpid() else { return nil }
         // Helpers share the process group of the app that launched them, so the group
         // leader tells Dia's "company.thebrowser.browser.helper" apart from Arc's.
         let owner = NSRunningApplication(processIdentifier: getpgid(pid))
+        guard owner?.bundleIdentifier != Bundle.main.bundleIdentifier else { return nil }
         if let known = [owner?.bundleIdentifier, process.string(kAudioProcessPropertyBundleID)]
             .compactMap({ $0.flatMap(MeetingApp.matching) }).first {
             return known
