@@ -23,7 +23,7 @@ Reprise is one tool for one job: recording calls. There is nothing else in it, a
 
 A call recorder fails in two ways: you forgot to press Record, or an hour later the other side isn't in the file. Reprise is built against both.
 
-- **It doesn't miss a call.** It notices calls by itself and asks once, or records without asking for the apps you choose. It can keep a call from its first second, even if you press Record later. It keeps recording through a lost microphone or a new headset, and repairs a recording cut off by a crash.
+- **It doesn't miss a call.** It notices calls by itself and asks once, or records without asking for the apps you choose. It can keep a call from its first second, even if you press Record later. It keeps recording through a lost microphone or a new headset, gets the other side back if their sound stops coming while the call goes on, and repairs a recording cut off by a crash.
 - **You see both sides.** While it records, the pill shows the two dots of the logo: one lights up when you speak, the red one when the others do.
 - **Plain files.** Each call is a folder of ordinary files on your Mac, ready for any player, editor or script. No account, no cloud, no virtual audio driver.
 
@@ -50,10 +50,14 @@ MIT, no paid version, no account. A call recorder needs your trust, and trust is
 ## What it does
 
 - Finds calls in Zoom, Google Meet, Microsoft Teams, FaceTime, Slack, Telegram, WhatsApp, [and more](Reprise/Capture/MeetingDetector.swift), in apps and in browsers, and asks **Record this call?** Each app can be set to **Ask**, **Always Record** or **Ignore**.
-- Records your microphone and the sound of the Mac into one file, and the screen if you want it.
+- Records your microphone and the sound of the Mac into one file, and the screen if you want it. For a podcast or an interview, each side can also go into a file of its own.
+- Marks a moment with one click on the pill or a hotkey, so you can find it later without taking notes.
+- Names a call after the calendar event it belongs to, if you want.
 - Stops when the call ends.
-- Keeps every call in a library: play it, search titles and transcripts, share it, drag it into Mail or Finder.
+- Keeps every call in a library: play it, jump to its marks, search titles and transcripts, share it, drag it into Mail or Finder.
+- Hands each saved call to a shortcut of your choice, to move the files, run a script on them, or send them on.
 - Optionally sends a call to a transcription service you choose, including one running on your own Mac.
+- Speaks English and Russian.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/library-dark.png">
@@ -77,6 +81,9 @@ On first start, Reprise asks for the **Microphone** (your voice) and **System Au
 - **From the first second.** Turn on **Settings > General > Record calls from the first second**. Reprise then records while it asks. If you don't press Record, that audio is deleted for good.
 - **Keyboard, Spotlight and Siri.** Use **Start Recording** and **Stop Recording** from Spotlight, Shortcuts or Siri. For a hotkey, add one to a shortcut in the Shortcuts app.
 - **The pill.** Drag it anywhere. Double-click it to hide it until the call ends, and the menu bar shows the time instead.
+- **Marks.** Hover over the pill and click the flag, or add **Mark This Moment** to a shortcut with a keyboard shortcut. In the library, a click on a flag plays from a few seconds before it.
+- **After each call.** In **Settings > General**, pick a shortcut. It gets the call's folder once it's saved, with the transcript if Reprise transcribes calls automatically.
+- **Space.** **Settings > General > Keep screen recordings** moves older screen recordings to the Trash. The calls stay, with their sound.
 - **Without a call.** Choose **Start Recording** in the menu bar, or press ⌘N in the library.
 
 ## Transcription
@@ -98,8 +105,10 @@ Each call is a folder in `~/Movies/Reprise`:
 
 ```
 2026-10-06 21.30.12 Google Meet/
-├── recording.json   title, app, start time, duration
+├── recording.json   title, app, start time, duration, marks
 ├── audio.m4a        the call
+├── you.m4a          your microphone alone, if you save each side
+├── them.m4a         everyone else alone, if you save each side
 ├── screen.mov       the screen, if you recorded it
 └── transcript.txt   the text, if you transcribed it
 ```
