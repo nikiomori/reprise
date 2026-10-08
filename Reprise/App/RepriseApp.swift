@@ -156,7 +156,7 @@ extension Notification.Name {
 
 extension NSImage {
     /// The logo's repeat sign  :‖  sized for the menu bar. The lower dot — the other side of
-    /// the call — turns red while recording; otherwise it's a template the system tints.
+    /// the call — turns red and the wide bar fills while recording; otherwise it's a template the system tints.
     /// `time` follows the sign in digits that keep their width: the menu bar ignores a label's font.
     static func repriseGlyph(recording: Bool, time: String? = nil) -> NSImage {
         let text = time.map { NSAttributedString(string: $0, attributes: [
@@ -166,11 +166,20 @@ extension NSImage {
         let image = NSImage(size: NSSize(width: text.map { 20 + ceil($0.size().width) } ?? 15, height: 16), flipped: true) { _ in
             let ink = recording ? NSColor.labelColor : .black
             ink.setFill()
-            NSBezierPath(ovalIn: NSRect(x: 0.5, y: 4, width: 3.4, height: 3.4)).fill()
-            NSBezierPath(roundedRect: NSRect(x: 5.6, y: 1, width: 1.6, height: 14), xRadius: 0.8, yRadius: 0.8).fill()
-            NSBezierPath(roundedRect: NSRect(x: 8.9, y: 1, width: 5.2, height: 14), xRadius: 1.4, yRadius: 1.4).fill()
+            ink.setStroke()
+            NSBezierPath(ovalIn: NSRect(x: 1, y: 4.9, width: 2.8, height: 2.8)).fill()
+            NSBezierPath(roundedRect: NSRect(x: 5.6, y: 2, width: 1.4, height: 12), xRadius: 0.7, yRadius: 0.7).fill()
+            // Hollow while waiting, as light as the system's symbols next to it: filled, it was
+            // the heaviest thing in the menu bar all day. Filled while recording.
+            if recording {
+                NSBezierPath(roundedRect: NSRect(x: 8.55, y: 1.95, width: 4.7, height: 12.1), xRadius: 1.4, yRadius: 1.4).fill()
+            } else {
+                let bar = NSBezierPath(roundedRect: NSRect(x: 9.1, y: 2.5, width: 3.6, height: 11), xRadius: 0.9, yRadius: 0.9)
+                bar.lineWidth = 1.1
+                bar.stroke()
+            }
             (recording ? NSColor.systemRed : ink).setFill()
-            NSBezierPath(ovalIn: NSRect(x: 0.5, y: 8.6, width: 3.4, height: 3.4)).fill()
+            NSBezierPath(ovalIn: NSRect(x: 1, y: 8.3, width: 2.8, height: 2.8)).fill()
             if let text { text.draw(at: NSPoint(x: 20, y: (16 - text.size().height) / 2)) }
             return true
         }
