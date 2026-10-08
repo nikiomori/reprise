@@ -76,7 +76,13 @@ import Security
     private nonisolated static func latest() async throws -> Release {
         var request = URLRequest(url: URL(string: "https://api.github.com/repos/nikiomori/reprise/releases/latest")!)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // A session of its own, gone with its connections once the answer is in: the shared one
+        // kept them, and a cache, for the rest of the day. 0.5 MB of a menu bar app waiting for calls.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw Failure(errorDescription: "GitHub answered \(status). Try again later.") }
         return try JSONDecoder().decode(Release.self, from: data)
