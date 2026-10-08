@@ -50,7 +50,7 @@ struct MenuBarView: View {
             Button("Open Library") { open(nil) }
             SettingsLink { Text("Settings…") }
                 .keyboardShortcut(",")
-            Button("Quit Reprise") { NSApp.terminate(nil) }
+            Button("Quit Reprise", action: quit)
                 .keyboardShortcut("q")
         }
         .buttonStyle(RowHighlightButtonStyle())

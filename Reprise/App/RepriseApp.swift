@@ -87,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log.notice("Launched. Microphone: \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue), screen: \(CGPreflightScreenCaptureAccess())")
         // `kill` and friends go through the normal quit, so a recording in progress gets saved.
         signal(SIGTERM, SIG_IGN)
-        termination.setEventHandler { NSApp.terminate(nil) }
+        termination.setEventHandler { quit() }
         termination.resume()
         #if DEBUG
         DebugSnapshots.runIfRequested()
@@ -97,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Never lose a call: finish writing the file before quitting.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let model = AppModel.shared
-        guard model.session != nil || model.stopping != nil else { return .terminateNow }
+        guard model.session != nil || !model.saving.isEmpty else { return .terminateNow }
         Task {
             await model.stopRecording()
             sender.reply(toApplicationShouldTerminate: true)
@@ -210,5 +210,12 @@ func relaunch() {
     reopen.executableURL = URL(filePath: "/bin/sh")
     reopen.arguments = ["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$0\"", Bundle.main.bundlePath, "\(getpid())"]
     try? reopen.run()
-    NSApp.terminate(nil)
+    quit()
+}
+
+/// Quits from the run loop, never from inside a block on the main queue (a Task, a dispatch source):
+/// a quit that waits for a recording to be saved runs the run loop until it is, and that block would
+/// hold up the main queue, and the save with it. Reprise hung for good, still recording.
+func quit() {
+    NSApp.perform(#selector(NSApplication.terminate), with: nil, afterDelay: 0)
 }

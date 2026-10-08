@@ -280,7 +280,7 @@ enum IslandState: Equatable {
     }
 
     /// The stops in progress, so quitting can wait until the files are written.
-    @ObservationIgnored private(set) var stopping: Task<Void, Never>?
+    @ObservationIgnored private var stopping: Task<Void, Never>?
 
     func stopRecording() async {
         stop()
