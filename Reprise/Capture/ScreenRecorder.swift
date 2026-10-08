@@ -91,9 +91,10 @@ nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelega
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
         // Only frames with new pixels: while the screen stands still, ScreenCaptureKit sends empty ones.
+        // Read in place: bridged to Swift dictionaries, each frame's attachments took half this method's time.
         guard type == .screen, let writer, let input,
-              let info = (CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first,
-              (info[.status] as? Int).flatMap(SCFrameStatus.init) == .complete else { return }
+              let info = (CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as NSArray?)?.firstObject as? NSDictionary,
+              (info[SCStreamFrameInfo.status.rawValue] as? NSNumber)?.intValue == SCFrameStatus.complete.rawValue else { return }
         if startHostTime == nil {
             writer.startSession(atSourceTime: buffer.presentationTimeStamp)
             started.withLock { $0 = CMClockConvertHostTimeToSystemUnits(buffer.presentationTimeStamp) }
