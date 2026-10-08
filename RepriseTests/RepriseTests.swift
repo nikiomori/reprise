@@ -24,8 +24,8 @@ import Testing
 }
 
 struct MixDownTests {
-    /// Mixes interleaved Float32 streams through `AudioRecorder.mixDown`.
-    private func mix(_ streams: [(channels: Int, samples: [Float])], micChannels: Int) -> (samples: [Float], you: Float, them: Float) {
+    /// Mixes interleaved Float32 streams through `AudioRecorder.mixDown`, each side into its own buffer too with `sides`.
+    private func mix(_ streams: [(channels: Int, samples: [Float])], micChannels: Int, sides: Bool = false) -> (samples: [Float], you: Float, them: Float, sides: [[Float]]) {
         let list = AudioBufferList.allocate(maximumBuffers: streams.count)
         let samples = streams.map { stream in
             let pointer = UnsafeMutablePointer<Float>.allocate(capacity: stream.samples.count)
@@ -33,16 +33,18 @@ struct MixDownTests {
             return pointer
         }
         let out = UnsafeMutablePointer<Float>.allocate(capacity: 64)
+        let you = UnsafeMutablePointer<Float>.allocate(capacity: 64), them = UnsafeMutablePointer<Float>.allocate(capacity: 64)
         defer {
             samples.forEach { $0.deallocate() }
-            out.deallocate()
+            [out, you, them].forEach { $0.deallocate() }
             free(list.unsafeMutablePointer)
         }
         for (i, stream) in streams.enumerated() {
             list[i] = AudioBuffer(mNumberChannels: UInt32(stream.channels), mDataByteSize: UInt32(stream.samples.count * 4), mData: samples[i])
         }
-        let (frames, you, them) = AudioRecorder.mixDown(list, micChannels: micChannels, into: out, capacity: 64)
-        return (Array(UnsafeBufferPointer(start: out, count: frames)), you, them)
+        let (frames, youPeak, themPeak) = AudioRecorder.mixDown(list, micChannels: micChannels, into: out, sides: sides ? (you, them) : nil, capacity: 64)
+        let read = { (buffer: UnsafeMutablePointer<Float>) in Array(UnsafeBufferPointer(start: buffer, count: frames)) }
+        return (read(out), youPeak, themPeak, sides ? [read(you), read(them)] : [])
     }
 
     @Test func sumsMicAndSystem() {
@@ -62,6 +64,12 @@ struct MixDownTests {
 
     @Test func clipsInsteadOfWrapping() {
         #expect(mix([(1, [0.9]), (1, [0.9])], micChannels: 1).samples == [1])
+    }
+
+    @Test func keepsEachSideOnItsOwn() {
+        let result = mix([(2, [0.2, 0.4, 0.9, 0.9]), (1, [0.1, 0.5])], micChannels: 2, sides: true)
+        #expect(result.sides == [[0.3, 0.9], [0.1, 0.5]])
+        #expect(result.samples == [0.3 + 0.1, 1]) // the same mix as without the sides
     }
 
     @Test func staysInsideAShortBuffer() {

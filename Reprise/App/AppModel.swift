@@ -132,7 +132,7 @@ enum IslandState: Equatable {
                     return show(.problem("Reprise needs microphone access"), for: .seconds(6))
                 }
                 recording = try store.create(app: app, at: .now)
-                audio = AudioRecorder(url: recording.partialAudioURL, processes: tapped(app))
+                audio = recorder(for: recording)
                 // Off the main thread: the first start blocks while macOS shows its permission prompt.
                 do { try await Task.detached { try audio.start() }.value } catch {
                     try? FileManager.default.removeItem(at: recording.folder) // nothing went into it
@@ -242,6 +242,12 @@ enum IslandState: Equatable {
     /// Silence from the other side this long, while the call app plays, gets the capture a new tap.
     static let healAfter: TimeInterval = 60
 
+    /// Records the call's sound into its folder, as Settings have it.
+    private func recorder(for recording: Recording) -> AudioRecorder {
+        AudioRecorder(url: recording.partialAudioURL, processes: tapped(recording.app),
+                      sides: UserDefaults.standard.bool(forKey: "separateTracks") ? recording.tracks.map(\.partial) : [])
+    }
+
     /// The call app's processes when Settings limit the audio to it. None, the whole Mac: a
     /// recording without a call, or an app whose audio processes aren't there.
     private func tapped(_ app: MeetingApp?) -> [AudioObjectID] {
@@ -254,7 +260,7 @@ enum IslandState: Equatable {
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
         prerolling = Task {
             guard let recording = try? store.create(app: app, at: .now) else { return }
-            let audio = AudioRecorder(url: recording.partialAudioURL, processes: tapped(app))
+            let audio = recorder(for: recording)
             guard (try? await Task.detached { try audio.start() }.value) != nil else {
                 try? FileManager.default.removeItem(at: recording.folder)
                 return

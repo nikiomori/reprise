@@ -28,6 +28,7 @@ private struct GeneralSettings: View {
     @AppStorage("showRecordingPill") private var showPill = true
     @AppStorage("recordFromStart") private var recordFromStart = false
     @AppStorage("callAppAudioOnly") private var callAppAudioOnly = false
+    @AppStorage("separateTracks") private var separateTracks = false
     @AppStorage("screenAccessRequested") private var screenRequested = false
     @AppStorage("systemAudioHeard") private var systemAudioHeard = false
     @AppStorage(Updater.autoKey) private var checkForUpdates = true
@@ -68,6 +69,10 @@ private struct GeneralSettings: View {
                 Toggle(isOn: $callAppAudioOnly) {
                     Text("Record only the sound of the call app")
                     Text("Music, videos, and notification sounds from other apps stay out of the audio. A recording without a call still gets all the sound of the Mac.")
+                }
+                Toggle(isOn: $separateTracks) {
+                    Text("Also save each side in its own file")
+                    Text("You and the others, as you.m4a and them.m4a next to the call, to edit a podcast or an interview. Takes a little more power and disk space.")
                 }
                 Toggle("Record the screen by default", isOn: $model.recordScreen)
                 Toggle("Show the floating pill while recording", isOn: $showPill)

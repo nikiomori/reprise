@@ -3,13 +3,15 @@ import CoreAudio
 import Synchronization
 
 /// Records the microphone and everything the Mac plays (except Reprise itself) into one AAC file,
-/// or only what the given processes play.
+/// or only what the given processes play. Each side can also go into a file of its own.
 ///
 /// A private aggregate device combines the default input device with a system-wide
 /// Core Audio process tap, so both sources share one clock (the tap is drift-compensated).
-/// Each IO cycle is mixed down to mono; the file gets the sound half a second at a time.
+/// Each IO cycle is mixed down to mono; the files get the sound half a second at a time.
 nonisolated final class AudioRecorder: @unchecked Sendable {
     private let url: URL
+    /// Your microphone and everyone else, each on its own besides the mix. None: only the mix.
+    private let sideURLs: [URL]
     private var processes: [AudioObjectID]
     private let queue = DispatchQueue(label: "dev.nikiomori.reprise.audio", qos: .userInteractive)
     /// Start, restart and stop take turns: a restart may still be at work when the recording stops.
@@ -20,11 +22,14 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private var microphone = AudioObjectID.unknown
     private var followingMicrophone: AudioObjectPropertyListenerBlock?
     private var procID: AudioDeviceIOProcID?
-    private var file: ADTSWriter?
-    private var mix: AVAudioPCMBuffer?
-    /// Brings a microphone's sound to the file's rate, when it runs at another one.
-    private var converter: AVAudioConverter?
-    private var resampled: AVAudioPCMBuffer?
+    /// The mix, then the sides if any.
+    private var files: [ADTSWriter] = []
+    /// An IO cycle's sound for each file, at the device's rate.
+    private var cycle: [AVAudioPCMBuffer] = []
+    /// Bring a microphone's sound to the files' rate, when it runs at another one: one per file,
+    /// as each keeps its state from cycle to cycle.
+    private var converters: [AVAudioConverter?] = []
+    private var resampled: [AVAudioPCMBuffer?] = []
     private var rate: Double = 0
     private var micChannels = 0
     /// Host time right after the last sound in the file.
@@ -38,10 +43,11 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private let started = Mutex<UInt64?>(nil)
     private var lead: UInt64 = 0 // nanoseconds
 
-    /// `processes` empty: the whole Mac.
-    init(url: URL, processes: [AudioObjectID] = []) {
+    /// `processes` empty: the whole Mac. `sides`: where your microphone and everyone else go on their own.
+    init(url: URL, processes: [AudioObjectID] = [], sides: [URL] = []) {
         self.url = url
         self.processes = processes
+        sideURLs = sides
     }
 
     /// False while nothing but silence has arrived — usually a missing privacy permission.
@@ -84,7 +90,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
 
     func start() throws {
         try control.withLock {
-            do { try connect() } catch { file = nil; throw error }
+            do { try connect() } catch { files = []; throw error }
         }
         // A headset plugged in or a mic picked in Sound settings mid-call: the call app moves to it, so
         // the recording does too. One that went away is the restart's job.
@@ -122,14 +128,14 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         control.withLock {
             disconnect()
             queue.sync {
-                file?.close()
-                file = nil
+                files.forEach { $0.close() }
+                files = []
             }
         }
     }
 
     private func reconnect() throws {
-        guard file != nil else { return } // stopped meanwhile
+        guard !files.isEmpty else { return } // stopped meanwhile
         disconnect()
         try connect()
     }
@@ -171,18 +177,19 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             // recording needs no low latency. Measured: a quarter less CPU while recording.
             let range = deviceID.get(kAudioDevicePropertyBufferFrameSizeRange, AudioValueRange())
             deviceID.set(kAudioDevicePropertyBufferFrameSize, UInt32(min(rate / 25, range.mMaximum)))
-            if file == nil {
+            if files.isEmpty {
                 // The file's time zero lies before the first IO cycle: the drift-compensated tap hands over
                 // the Mac's sound late (2399 frames, 50 ms, on a MacBook), and then comes the encoder delay.
                 let tapLatency = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
                 lead = UInt64(Double(Int(tapLatency) + Self.encoderDelay) / rate * 1e9)
-                file = try ADTSWriter(url: url, rate: rate)
+                files = try ([url] + sideURLs).map { try ADTSWriter(url: $0, rate: rate) }
             }
             let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
-            let fileFormat = file!.format
-            mix = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 16_384)
-            converter = rate == fileFormat.sampleRate ? nil : AVAudioConverter(from: format, to: fileFormat)
-            resampled = converter == nil ? nil : AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(16_384 * fileFormat.sampleRate / rate) + 64)
+            let fileFormat = files[0].format
+            let resampling = rate != fileFormat.sampleRate
+            cycle = files.map { _ in AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 16_384)! }
+            converters = files.map { _ in resampling ? AVAudioConverter(from: format, to: fileFormat) : nil }
+            resampled = files.map { _ in resampling ? AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(16_384 * fileFormat.sampleRate / rate) + 64) : nil }
 
             try check("start recording", AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, queue) { [weak self] _, input, inputTime, _, _ in
                 self?.write(input, at: inputTime.pointee.mHostTime)
@@ -205,7 +212,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         }
     }
 
-    /// Leaves the file open for `connect()` to go on with.
+    /// Leaves the files open for `connect()` to go on with.
     private func disconnect() {
         if let procID {
             AudioDeviceStop(deviceID, procID)
@@ -218,32 +225,36 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     }
 
     private func write(_ input: UnsafePointer<AudioBufferList>, at hostTime: UInt64) {
-        guard let file, let mix, let out = mix.floatChannelData?[0] else { return }
+        guard let out = cycle.first?.floatChannelData?[0] else { return }
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
-        let (frames, you, them) = Self.mixDown(buffers, micChannels: micChannels, into: out, capacity: Int(mix.frameCapacity))
+        let sides = cycle.count == 3 ? (you: cycle[1].floatChannelData![0], them: cycle[2].floatChannelData![0]) : nil
+        let (frames, you, them) = Self.mixDown(buffers, micChannels: micChannels, into: out, sides: sides, capacity: Int(cycle[0].frameCapacity))
         guard frames > 0 else { return }
         voices.withLock { $0 = (max($0.you, you), max($0.them, them)) }
         if you > 0 || them > 0 { heard.withLock { $0 = true } }
         if them > 0 { heardThem.withLock { $0 = hostTime } }
-        mix.frameLength = AVAudioFrameCount(frames)
+        cycle.forEach { $0.frameLength = AVAudioFrameCount(frames) }
         // Sound lost to a stalled cycle or a microphone change comes back as silence, so the file
         // keeps to the clock and the screen recording stays in sync with it.
         if let end, hostTime > end {
-            writeSilence(Double(AudioConvertHostTimeToNanos(hostTime - end)) / 1e9, to: file)
+            files.forEach { writeSilence(Double(AudioConvertHostTimeToNanos(hostTime - end)) / 1e9, to: $0) }
         }
-        guard (try? append(mix, to: file)) != nil else { return }
+        guard (try? files.indices.forEach(append)) != nil else { return }
         end = hostTime + AudioConvertNanosToHostTime(UInt64(Double(frames) / rate * 1e9))
         started.withLock { $0 = $0 ?? hostTime }
     }
 
-    private func append(_ buffer: AVAudioPCMBuffer, to file: ADTSWriter) throws {
-        var buffer = buffer
-        if let converter, let resampled {
+    /// This IO cycle's sound into the file at `index`.
+    private func append(_ index: Int) throws {
+        let file = files[index]
+        var buffer = cycle[index]
+        if let converter = converters[index], let resampled = resampled[index] {
             try Self.convert(buffer, with: converter, into: resampled)
             buffer = resampled
         }
         try file.encode(buffer)
-        guard file.writeIfDue() else { return }
+        // Every file writes when due; the mix's progress stands for all of them.
+        guard file.writeIfDue(), index == 0 else { return }
         written.withLock { $0 = file.written }
         waitingForDisk.withLock { $0 = file.isWaitingForDisk }
     }
@@ -275,8 +286,10 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     /// Mixes one IO cycle of interleaved Float32 buffers down to mono: the average of the
     /// first `micChannels` channels (the mic — the aggregate lists sub-device streams before
     /// tap streams) plus the average of the rest (system audio), clipped to -1...1.
+    /// `sides` get each of the two averages on its own, clipped too.
     /// Returns the number of frames written to `out` and the peak of each side before mixing.
-    static func mixDown(_ buffers: UnsafeMutableAudioBufferListPointer, micChannels: Int, into out: UnsafeMutablePointer<Float>, capacity: Int) -> (frames: Int, you: Float, them: Float) {
+    static func mixDown(_ buffers: UnsafeMutableAudioBufferListPointer, micChannels: Int, into out: UnsafeMutablePointer<Float>,
+                        sides: (you: UnsafeMutablePointer<Float>, them: UnsafeMutablePointer<Float>)? = nil, capacity: Int) -> (frames: Int, you: Float, them: Float) {
         guard let first = buffers.first, first.mNumberChannels > 0 else { return (0, 0, 0) }
         let frames = Int(first.mDataByteSize) / (MemoryLayout<Float>.size * Int(first.mNumberChannels))
         guard frames > 0, frames <= capacity else { return (0, 0, 0) }
@@ -286,6 +299,8 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         let systemWeight = totalChannels > micChannels ? 1 / Float(totalChannels - micChannels) : 0
 
         out.update(repeating: 0, count: frames)
+        sides?.you.update(repeating: 0, count: frames)
+        sides?.them.update(repeating: 0, count: frames)
         var you: Float = 0, them: Float = 0
         var channel = 0
         for buffer in buffers {
@@ -296,13 +311,21 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             for c in 0..<count {
                 let isMic = channel + c < micChannels
                 let weight = isMic ? micWeight : systemWeight
+                let into = sides.map { isMic ? $0.you : $0.them } ?? out
                 var loudest: Float = 0
                 for f in 0..<available {
                     let sample = data[f * count + c]
-                    out[f] += sample * weight
+                    into[f] += sample * weight
                     loudest = max(loudest, abs(sample))
                 }
                 if isMic { you = max(you, loudest) } else { them = max(them, loudest) }
+            }
+        }
+        if let sides {
+            for f in 0..<frames {
+                out[f] = sides.you[f] + sides.them[f]
+                sides.you[f] = min(1, max(-1, sides.you[f]))
+                sides.them[f] = min(1, max(-1, sides.them[f]))
             }
         }
         for f in 0..<frames { out[f] = min(1, max(-1, out[f])) }
