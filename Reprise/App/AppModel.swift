@@ -190,6 +190,7 @@ enum IslandState: Equatable {
         var written = -1
         var shown: String? // each warning once while it lasts, so another one still gets through
         var stalledBefore = false
+        var healAfter = Self.healAfter
         for tick in 0... {
             // The first look comes early: until the movie's start is saved, a crash leaves it without sound.
             try? await Task.sleep(for: .seconds(tick == 0 ? 1 : 5))
@@ -222,8 +223,24 @@ enum IslandState: Equatable {
             }
             stalledBefore = stalled
             written = now
+            // The other side went quiet while the call app still plays: a tap that stopped delivering
+            // (macOS 26.5 loses one now and then), or one on audio processes the app has since replaced.
+            // A new tap on the app's processes as they are now; less and less often while that doesn't help.
+            let quiet = audio.secondsWithoutThem ?? 0
+            if quiet < Self.healAfter { healAfter = Self.healAfter }
+            if quiet >= healAfter, let app = session.recording.app, MeetingDetector.isPlaying(app) {
+                healAfter = quiet * 2
+                log.notice("No sound from the other side for \(Int(quiet))s while \(app.id, privacy: .public) plays; restarting the capture")
+                let processes = tapped(app)
+                do { try await Task.detached { try audio.restart(processes: processes) }.value } catch {
+                    log.error("Restart failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
         }
     }
+
+    /// Silence from the other side this long, while the call app plays, gets the capture a new tap.
+    static let healAfter: TimeInterval = 60
 
     /// The call app's processes when Settings limit the audio to it. None, the whole Mac: a
     /// recording without a call, or an app whose audio processes aren't there.

@@ -10,7 +10,7 @@ import Synchronization
 /// Each IO cycle is mixed down to mono; the file gets the sound half a second at a time.
 nonisolated final class AudioRecorder: @unchecked Sendable {
     private let url: URL
-    private let processes: [AudioObjectID]
+    private var processes: [AudioObjectID]
     private let queue = DispatchQueue(label: "dev.nikiomori.reprise.audio", qos: .userInteractive)
     /// Start, restart and stop take turns: a restart may still be at work when the recording stops.
     private let control = NSLock()
@@ -31,7 +31,8 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     private var end: UInt64?
     private let voices = Mutex<(you: Float, them: Float)>((0, 0))
     private let heard = Mutex(false)
-    private let heardThem = Mutex(false)
+    /// Host time of the last IO cycle with the Mac's sound in it.
+    private let heardThem = Mutex<UInt64?>(nil)
     private let written = Mutex(0)
     private let waitingForDisk = Mutex(false)
     private let started = Mutex<UInt64?>(nil)
@@ -47,7 +48,14 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     var hasHeardSound: Bool { heard.withLock { $0 } }
 
     /// True once the Mac's sound came through — which macOS only allows with the system audio permission.
-    var hasHeardThem: Bool { heardThem.withLock { $0 } }
+    var hasHeardThem: Bool { heardThem.withLock { $0 } != nil }
+
+    /// Seconds since the Mac's sound last came through, or since the recording began if it never did.
+    var secondsWithoutThem: TimeInterval? {
+        guard let since = heardThem.withLock({ $0 }) ?? started.withLock({ $0 }) else { return nil }
+        let now = AudioGetCurrentHostTime()
+        return now > since ? Double(AudioConvertHostTimeToNanos(now - since)) / 1e9 : 0
+    }
 
     /// Frames that made it into the file. Stuck while the device is gone or the disk is full.
     var framesWritten: Int { written.withLock { $0 } }
@@ -97,8 +105,12 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     /// Goes on into the same file with the microphone there is now: the old one went away, taking
     /// the clock of the Mac's sound with it, or changed its rate. The time without sound becomes
     /// silence, so the screen recording stays in sync.
-    func restart() throws {
-        try control.withLock { try reconnect() }
+    /// `processes`: the call app's audio processes as they are now, for a recording of only its sound.
+    func restart(processes: [AudioObjectID] = []) throws {
+        try control.withLock {
+            if !self.processes.isEmpty, !processes.isEmpty { self.processes = processes }
+            try reconnect()
+        }
     }
 
     func stop() {
@@ -212,7 +224,7 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         guard frames > 0 else { return }
         voices.withLock { $0 = (max($0.you, you), max($0.them, them)) }
         if you > 0 || them > 0 { heard.withLock { $0 = true } }
-        if them > 0 { heardThem.withLock { $0 = true } }
+        if them > 0 { heardThem.withLock { $0 = hostTime } }
         mix.frameLength = AVAudioFrameCount(frames)
         // Sound lost to a stalled cycle or a microphone change comes back as silence, so the file
         // keeps to the clock and the screen recording stays in sync with it.

@@ -257,6 +257,11 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter { Self.app(of: $0) == app }
     }
 
+    /// Some process of the app is playing sound, even if it's silence.
+    static func isPlaying(_ app: MeetingApp) -> Bool {
+        processes(of: app).contains { $0.get(kAudioProcessPropertyIsRunningOutput, UInt32(0)) == 1 }
+    }
+
     /// None for Reprise itself, another copy included: a development build recording next to the
     /// app was offered as a call, and listed in Settings among the other apps.
     private static func app(of process: AudioObjectID) -> MeetingApp? {
