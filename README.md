@@ -33,9 +33,9 @@ A call recorder runs for hours next to the call app, often on battery, so every 
 
 | | CPU | Memory |
 |---|---|---|
-| Waiting for a call in the menu bar | 0.05% | 21 MB |
-| Recording a call, pill on screen | 1.5% | 24 MB |
-| Recording the screen too, with macOS's capture service | 5–8% | |
+| Waiting for a call in the menu bar | 0.003–0.04% | 20 MB |
+| Recording a call, pill on screen | 0.8–1.4% | 25 MB |
+| Recording the screen too, with macOS's capture service | 3.5–4% | |
 
 - Between calls Reprise waits for Core Audio events instead of polling, with one safety check every 30 seconds.
 - The pill's dots are Core Animation layers, not views redrawn every frame. Before that, recording with the pill took 15–20% CPU.
