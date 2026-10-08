@@ -74,7 +74,6 @@ private struct RecordRow: View {
         Button(action: model.toggleRecording) {
             HStack(spacing: 10) {
                 Chip(icon: model.session == nil ? "record.circle" : "stop.fill", tint: model.session == nil ? nil : .red)
-                    .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(model.session == nil ? "Start Recording" : "Stop Recording")
                     Text(status).font(.caption).foregroundStyle(.secondary)

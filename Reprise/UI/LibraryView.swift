@@ -50,7 +50,6 @@ struct LibraryView: View {
             } else if model.store.recordings.isEmpty {
                 ContentUnavailableView {
                     Label("No Calls Yet", systemImage: "waveform")
-                        .symbolEffect(.variableColor.iterative.dimInactiveLayers, options: .repeating, isActive: !reduceMotion)
                 } description: {
                     Text("Join a call, and Reprise offers to record it.")
                 }
@@ -64,7 +63,6 @@ struct LibraryView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: model.toggleRecording) {
                     Label(model.session == nil ? "Record" : "Stop", systemImage: model.session == nil ? "record.circle" : "stop.circle.fill")
-                        .contentTransition(.symbolEffect(.replace))
                 }
                 .tint(.red)
                 .help(model.session == nil ? "Start recording now" : "Stop recording")
@@ -364,7 +362,6 @@ private struct PlayerCard: View {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title2)
                         .frame(width: 30, height: 30)
-                        .contentTransition(.symbolEffect(.replace.downUp))
                 }
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.circle)

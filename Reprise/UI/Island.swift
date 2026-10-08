@@ -218,7 +218,6 @@ private struct ScreenToggle: View {
     var body: some View {
         Toggle(isOn: $model.recordScreen) {
             Image(systemName: model.recordScreen ? "rectangle.inset.filled.badge.record" : "rectangle.dashed.badge.record")
-                .contentTransition(.symbolEffect(.replace))
         }
         .toggleStyle(.button)
         .buttonStyle(.glass)
@@ -296,15 +295,12 @@ private struct ResetPositionButton: View {
 
 private struct SavedContent: View {
     let recording: Recording
-    @State private var drawn = false
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.title3)
                 .foregroundStyle(.green)
-                .symbolEffect(.drawOn, isActive: !drawn)
-                .onAppear { drawn = true }
             VStack(alignment: .leading, spacing: 0) {
                 Text("Saved").font(.headline)
                 // What was saved, not just a number that could be a time of day.
