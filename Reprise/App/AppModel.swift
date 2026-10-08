@@ -351,7 +351,9 @@ enum IslandState: Equatable {
         default: show(.saved(recording), for: .seconds(5))
         }
         if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey), TranscriptionSettings.service != nil {
-            transcribe(recording)
+            transcribe(recording, then: Shortcut.runAfterCall) // with its transcript
+        } else {
+            Shortcut.runAfterCall(recording)
         }
     }
 
@@ -463,8 +465,9 @@ enum IslandState: Equatable {
         return rest.dropFirst(list.firstIndex(of: id) ?? 0).first ?? rest.last
     }
 
-    func transcribe(_ recording: Recording) {
-        guard !isLive(recording), transcribing[recording.id] == nil, let service = TranscriptionSettings.service else { return }
+    /// `then`: once it's done, whether it worked or not.
+    func transcribe(_ recording: Recording, then done: @escaping (Recording) -> Void = { _ in }) {
+        guard !isLive(recording), transcribing[recording.id] == nil, let service = TranscriptionSettings.service else { return done(recording) }
         transcribing[recording.id] = 0
         transcriptionErrors[recording.id] = nil
         let apiKey = TranscriptionSettings.apiKey
@@ -480,7 +483,38 @@ enum IslandState: Equatable {
             }
             transcribing[recording.id] = nil
             store.save(store.recordings.first { $0.id == recording.id } ?? recording) // nudge observers
+            done(recording)
         }
+    }
+}
+
+/// A shortcut from the Shortcuts app that gets each call's folder once it's saved: to move the
+/// files, run a script on them, or send them on. What Reprise itself doesn't do, the user's own tools can.
+enum Shortcut {
+    static let key = "afterCallShortcut"
+
+    static func runAfterCall(_ recording: Recording) {
+        guard let name = UserDefaults.standard.string(forKey: key), !name.isEmpty else { return }
+        let run = Process()
+        run.executableURL = URL(filePath: "/usr/bin/shortcuts")
+        run.arguments = ["run", name, "--input-path", recording.folder.path]
+        run.terminationHandler = { run in
+            let status = run.terminationStatus
+            Task { @MainActor in log.notice("Shortcut after the call ended with \(status)") }
+        }
+        do { try run.run() } catch {
+            log.error("Shortcut after the call didn't start: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// The user's shortcuts, by name.
+    @concurrent static func all() async -> [String] {
+        let list = Process(), pipe = Pipe()
+        list.executableURL = URL(filePath: "/usr/bin/shortcuts")
+        list.arguments = ["list"]
+        list.standardOutput = pipe
+        guard (try? list.run()) != nil, let data = try? pipe.fileHandleForReading.readToEnd() else { return [] }
+        return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init)
     }
 }
 

@@ -31,6 +31,8 @@ private struct GeneralSettings: View {
     @AppStorage("separateTracks") private var separateTracks = false
     @AppStorage(CalendarEvents.key) private var calendarTitles = false
     @State private var calendars = CalendarEvents.isAllowed
+    @AppStorage(Shortcut.key) private var shortcut = ""
+    @State private var shortcuts: [String] = []
     @AppStorage("screenAccessRequested") private var screenRequested = false
     @AppStorage("systemAudioHeard") private var systemAudioHeard = false
     @AppStorage(Updater.autoKey) private var checkForUpdates = true
@@ -87,6 +89,22 @@ private struct GeneralSettings: View {
                 }
                 Toggle("Record the screen by default", isOn: $model.recordScreen)
                 Toggle("Show the floating pill while recording", isOn: $showPill)
+            }
+            Section {
+                Picker("Run a shortcut", selection: $shortcut) {
+                    Text("None").tag("")
+                    Divider()
+                    if !shortcut.isEmpty, !shortcuts.contains(shortcut) {
+                        Text(shortcut).tag(shortcut) // renamed or deleted in Shortcuts since
+                    }
+                    ForEach(shortcuts, id: \.self) { Text($0).tag($0) }
+                }
+                .task { shortcuts = await Shortcut.all() }
+            } header: {
+                Text("After Each Call")
+            } footer: {
+                Text("The shortcut gets the call's folder once it's saved, with its transcript if Reprise transcribes calls automatically. It can move the files, run a script on them, or send them on.")
+                    .foregroundStyle(.secondary)
             }
             Section("Permissions") {
                 PermissionRow(title: "Microphone", detail: "Your side of the call", granted: microphone == .authorized, pane: "Privacy_Microphone",
