@@ -293,7 +293,15 @@ private struct LiveCard: View {
 
 @Observable final class Player {
     let avPlayer: AVPlayer
-    private(set) var time: Double = 0
+    /// Only the wave's played part reads it, as often as it changes.
+    private(set) var time: Double = 0 {
+        didSet {
+            let whole = time.isFinite ? Int(time) : 0 // a seek into an unknown length
+            if whole != second { second = whole }
+        }
+    }
+    /// `time` in whole seconds, for the clocks, which then redraw once a second.
+    private(set) var second = 0
     private(set) var duration: Double = 0
     private(set) var isPlaying = false
     var rate: Float = 1 {
@@ -306,15 +314,22 @@ private struct LiveCard: View {
 
     init(url: URL) {
         avPlayer = AVPlayer(url: url)
-        // Also called when playback starts or stops — at the end, or from the video's own controls.
-        observer = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] time in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.time = time.seconds
-                if self.isPlaying != (self.avPlayer.rate != 0) { self.isPlaying.toggle() }
+        Task {
+            duration = (try? await avPlayer.currentItem?.asset.load(.duration).seconds) ?? 0
+            // As often as the playhead moves a pixel on a wave about 1400 wide, from 32 times a second to
+            // once, and a fraction of a second, so the clocks still turn on the second. A 40-minute call
+            // redrew the player 30 times a second: 6% CPU to play it.
+            let intervals: [Double] = [1, 1 / 2, 1 / 4, 1 / 8, 1 / 16]
+            let interval = intervals.first { $0 <= duration / 1400 } ?? 1 / 32
+            // Also called when playback starts or stops — at the end, or from the video's own controls.
+            observer = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: interval, preferredTimescale: 600), queue: .main) { [weak self] time in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.time = time.seconds
+                    if self.isPlaying != (self.avPlayer.rate != 0) { self.isPlaying.toggle() }
+                }
             }
         }
-        Task { duration = (try? await avPlayer.currentItem?.asset.load(.duration).seconds) ?? 0 }
     }
 
     /// AVPlayer: an observer released without being removed is undefined behavior.
@@ -346,9 +361,9 @@ private struct PlayerCard: View {
                 .frame(height: 64)
             // Elapsed and remaining under the wave, like Music and Voice Memos.
             HStack {
-                Text(player.time.clock)
+                Text(Double(player.second).clock)
                 Spacer()
-                Text("−\(max(0, player.duration - player.time).clock)")
+                Text("−\(max(0, player.duration - Double(player.second)).clock)")
             }
             .font(.caption)
             .monospacedDigit()
@@ -406,13 +421,12 @@ private struct WaveformScrubber: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let progress = player.duration > 0 ? player.time / player.duration : 0
             let wave = WaveformShape(peaks: peaks.isEmpty ? Array(repeating: 0, count: bars) : peaks, grown: peaks.isEmpty ? 0 : 1)
             // The playhead only moves a mask; the bars themselves are drawn once.
             ZStack {
                 wave.fill(.tertiary)
                 wave.fill(.tint).mask(alignment: .leading) {
-                    Rectangle().frame(width: geometry.size.width * progress)
+                    PlayedPart(player: player)
                 }
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.8), value: peaks.isEmpty)
@@ -431,11 +445,21 @@ private struct WaveformScrubber: View {
         }
         .accessibilityElement()
         .accessibilityLabel("Playback position")
-        .accessibilityValue("\(player.time.clock) of \(player.duration.clock)")
+        .accessibilityValue("\(Double(player.second).clock) of \(player.duration.clock)")
         .accessibilityAdjustableAction { direction in
             player.skip(direction == .increment ? 15 : -15)
         }
         .task { peaks = await Waveform.peaks(of: source, count: bars) }
+    }
+}
+
+/// The mask over the played bars: the one view that follows every move of the playhead. Scaled,
+/// so the moves need no layout.
+private struct PlayedPart: View {
+    let player: Player
+
+    var body: some View {
+        Rectangle().scaleEffect(x: player.duration > 0 ? player.time / player.duration : 0, y: 1, anchor: .leading)
     }
 }
 
