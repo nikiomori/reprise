@@ -494,8 +494,8 @@ private struct CountdownRing: NSViewRepresentable {
     func updateNSView(_ view: NSView, context: Context) {}
 }
 
-private extension NSColor {
-    /// The island is always dark.
+extension NSColor {
+    /// The island is always dark, and so is Welcome's tiny desktop.
     var darkCGColor: CGColor {
         var color = cgColor
         NSAppearance(named: .darkAqua)?.performAsCurrentDrawingAppearance { color = cgColor }

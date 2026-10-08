@@ -141,22 +141,14 @@ private struct Step: View {
 /// A tiny desktop that plays the whole story on loop: call → record → saved.
 private struct Demo: View {
     @State private var stage = 0
+    /// SwiftUI keeps a closed window's views, and their tasks go on: closed after onboarding, the
+    /// demo went on playing its story until Reprise quit.
+    @State private var onScreen = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .top) {
-            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-                let t = Float(context.date.timeIntervalSinceReferenceDate * 0.25)
-                MeshGradient(width: 3, height: 3, points: [
-                    [0, 0], [0.5, 0], [1, 0],
-                    [0, 0.5], [0.5 + 0.15 * sin(t), 0.5 + 0.12 * cos(t * 1.3)], [1, 0.5],
-                    [0, 1], [0.5, 1], [1, 1],
-                ], colors: [
-                    .indigo, .purple, .pink,
-                    .blue, .orange.mix(with: .pink, by: 0.4), .red,
-                    .teal, .indigo, .purple,
-                ])
-            }
+            Backdrop(drifts: !reduceMotion)
             Rectangle().fill(.black.opacity(0.18)).frame(height: 22)
 
             capsule
@@ -164,8 +156,10 @@ private struct Demo: View {
                 .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.3), value: stage)
         }
         .environment(\.colorScheme, .dark)
-        .task {
-            while !Task.isCancelled {
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+        .task(id: onScreen) {
+            while onScreen, !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(stage == 3 ? 1.2 : 2.4))
                 stage = (stage + 1) % 4
             }
@@ -204,6 +198,77 @@ private struct Demo: View {
             .transition(.blurReplace)
             .glassEffect(.regular, in: .capsule)
             .transition(reduceMotion ? .opacity : .scale(scale: 0.5, anchor: .top).combined(with: .opacity))
+        }
+    }
+}
+
+/// The tiny desktop's colors, the center one drifting: gradient layers, moved by Core Animation
+/// itself. A MeshGradient took 260 MB of graphics memory as it first drew and kept 7 MB, and its
+/// timeline redrew the window 30 times a second.
+private struct Backdrop: NSViewRepresentable {
+    let drifts: Bool
+
+    func makeNSView(context: Context) -> Layers { Layers(drifts: drifts) }
+    func updateNSView(_ view: Layers, context: Context) {}
+
+    final class Layers: NSView {
+        private let middle = CAGradientLayer(), top = CAGradientLayer(), bottom = CAGradientLayer(), glow = CAGradientLayer()
+        private let drifts: Bool
+
+        init(drifts: Bool) {
+            self.drifts = drifts
+            super.init(frame: .zero)
+            wantsLayer = true
+            // The rows of a 3 × 3 mesh: each a gradient across, the top and bottom ones fading out
+            // towards the middle row, and a glow where the mesh's center point was.
+            for (layer, colors) in [(middle, [NSColor.systemBlue, .systemPink, .systemRed]),
+                                    (top, [.systemIndigo, .systemPurple, .systemPink]),
+                                    (bottom, [.systemTeal, .systemIndigo, .systemPurple])] {
+                layer.colors = colors.map(\.darkCGColor)
+                layer.startPoint = CGPoint(x: 0, y: 0.5)
+                layer.endPoint = CGPoint(x: 1, y: 0.5)
+                self.layer?.addSublayer(layer)
+            }
+            for (band, from, to) in [(top, 1.0, 0.45), (bottom, 0.0, 0.55)] {
+                let fade = CAGradientLayer()
+                fade.colors = [NSColor.black.cgColor, NSColor.clear.cgColor]
+                fade.startPoint = CGPoint(x: 0.5, y: from)
+                fade.endPoint = CGPoint(x: 0.5, y: to)
+                band.mask = fade
+            }
+            let orange = NSColor.systemOrange.blended(withFraction: 0.4, of: .systemPink) ?? .systemOrange
+            glow.type = .radial
+            glow.colors = [orange.darkCGColor, orange.withAlphaComponent(0).darkCGColor]
+            glow.startPoint = CGPoint(x: 0.5, y: 0.5)
+            glow.endPoint = CGPoint(x: 1, y: 1)
+            layer?.addSublayer(glow)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func layout() {
+            super.layout()
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for layer in [middle, top, bottom] {
+                layer.frame = bounds
+                layer.mask?.frame = bounds
+            }
+            glow.bounds = CGRect(x: 0, y: 0, width: bounds.width * 0.7, height: bounds.height * 0.8)
+            glow.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            CATransaction.commit()
+            guard drifts, glow.animationKeys() == nil, bounds.width > 0 else { return }
+            // As the mesh's center point drifted: across by 15%, up and down by 12%, out of step.
+            for (key, by, duration) in [("position.x", bounds.width * 0.15, 12.5), ("position.y", bounds.height * 0.12, 9.7)] {
+                let drift = CABasicAnimation(keyPath: key)
+                drift.byValue = by
+                drift.fromValue = (key == "position.x" ? bounds.midX : bounds.midY) - by / 2
+                drift.duration = duration
+                drift.autoreverses = true
+                drift.repeatCount = .infinity
+                drift.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                glow.add(drift, forKey: key)
+            }
         }
     }
 }
