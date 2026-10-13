@@ -286,6 +286,16 @@ struct UpdaterTests {
     }
 }
 
+struct TranscriptionServiceTests {
+    @Test(arguments: [("http://192.168.1.135:9001", "http://192.168.1.135:9001/v1/audio/transcriptions"),
+                      ("http://localhost:8000/", "http://localhost:8000/v1/audio/transcriptions"),
+                      ("https://api.groq.com/openai/v1", "https://api.groq.com/openai/v1/audio/transcriptions"),
+                      ("http://localhost:8000/v1/audio/transcriptions", "http://localhost:8000/v1/audio/transcriptions")])
+    func completesTheServerAddress(baseURL: String, endpoint: String) {
+        #expect(TranscriptionService(baseURL: baseURL, model: "").endpoint?.absoluteString == endpoint)
+    }
+}
+
 @MainActor struct RecordingStoreTests {
     let store = RecordingStore()
 

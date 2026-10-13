@@ -37,6 +37,14 @@ nonisolated struct TranscriptionService: Sendable {
     /// Refrain takes hours in one request, so it never gets pieces: no re-encoding, no context lost at a cut.
     /// Other local servers may have limits of their own.
     var isRefrain: Bool { baseURL == Self.refrain.baseURL }
+
+    /// A bare host gets the usual `/v1`; a pasted full endpoint is used as is.
+    var endpoint: URL? {
+        guard var url = URL(string: baseURL) else { return nil }
+        if url.path().isEmpty || url.path() == "/" { url.append(path: "v1") }
+        if url.lastPathComponent != "transcriptions" { url.append(path: "audio/transcriptions") }
+        return url
+    }
 }
 
 /// Transcription settings, persisted in UserDefaults (API key in the Keychain).
@@ -234,7 +242,7 @@ nonisolated enum Transcriber {
     private static func upload(
         _ file: URL, as format: Format, seconds: Double, service: TranscriptionService, apiKey: String?, language: String?, prompt: String
     ) async throws -> [Transcript.Segment] {
-        guard let url = URL(string: service.baseURL)?.appending(path: "audio/transcriptions") else {
+        guard let url = service.endpoint else {
             throw Failure("The server address isn't a valid URL.")
         }
         let boundary = "reprise-\(UUID().uuidString)"
