@@ -487,6 +487,33 @@ struct TranscriptionServiceTests {
         #expect(FileManager.default.contentsEqual(atPath: copy.path, andPath: recording.finalAudioURL.path))
     }
 
+    /// A recording made elsewhere, dropped onto the library: a call under the file's name, as long as
+    /// the file, which stays where it was. A call of the library's own dragged back in isn't added again.
+    @Test func droppedRecordingBecomesACall() async throws {
+        let name = "Interview \(UUID().uuidString)"
+        let wav = FileManager.default.temporaryDirectory.appending(path: "\(name).wav")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let file = try AVAudioFile(forWriting: wav, settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
+                                                               AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false])
+        let sound = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 96_000)!
+        sound.frameLength = 96_000
+        try file.write(from: sound)
+        file.close()
+        var own = try store.create(app: nil, at: .now)
+        defer { try? FileManager.default.removeItem(at: own.folder); try? FileManager.default.removeItem(at: own.copiesFolder) }
+        own.title = "Own call"
+        try twoSeconds(into: own.finalAudioURL)
+
+        let model = AppModel.shared
+        model.add([wav, CallFile(own).named(), own.finalAudioURL])
+        await model.stopRecording() // waits for it, as quitting does
+        let added = try #require(model.store.recordings.first { $0.title == name })
+        defer { try? FileManager.default.removeItem(at: added.folder) }
+        #expect(abs(added.duration - 2) < 0.05 && !model.isLive(added))
+        #expect(FileManager.default.fileExists(atPath: wav.path))
+        #expect(!model.store.recordings.contains { $0.title == "Own call" || $0.title == "audio" })
+    }
+
     /// Two seconds of sound in the crash-safe stream and a second of movie without sound, as a recording leaves them.
     private func screenRecording(movieStart: TimeInterval?) async throws -> Recording {
         var recording = try store.create(app: nil, at: .now)

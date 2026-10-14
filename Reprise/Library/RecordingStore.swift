@@ -45,7 +45,8 @@ struct Recording: Codable, Identifiable, Equatable {
     // ponytail: a call trashed in Finder keeps its clones' space until macOS clears the temporary
     // folder (3 days unused). Clear this folder for calls gone at reload if that's too late.
     /// The clones Share and dragging out hand over under the title. Trashing the call removes them.
-    var copiesFolder: URL { FileManager.default.temporaryDirectory.appending(path: "reprise-calls/\(id)", directoryHint: .isDirectory) }
+    var copiesFolder: URL { Self.copies.appending(path: id, directoryHint: .isDirectory) }
+    static let copies = FileManager.default.temporaryDirectory.appending(path: "reprise-calls", directoryHint: .isDirectory)
 }
 
 /// Names a call after the calendar event it belongs to, when Settings ask for it.
@@ -378,6 +379,17 @@ enum CalendarEvents {
         recording.title = recordings.first { $0.id == recording.id }?.title ?? recording.title // renamed while saving
         save(recording)
         return recording
+    }
+
+    /// The sound of a call recorded elsewhere as `audio`: the file itself when it's an `.m4a`, else
+    /// encoded into one, as the transcriber uploads it (a WAV's sound as it is would be ten times
+    /// the size). A movie gives its sound.
+    @concurrent static func importSound(of file: URL, to audio: URL) async throws {
+        guard file.pathExtension.lowercased() != "m4a" else { return try FileManager.default.copyItem(at: file, to: audio) }
+        guard let export = AVAssetExportSession(asset: AVURLAsset(url: file), presetName: AVAssetExportPresetAppleM4A) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        try await export.export(to: audio, as: .m4a)
     }
 
     nonisolated private static func remux(_ source: URL, to destination: URL) async throws {

@@ -316,7 +316,8 @@ enum IslandState: Equatable {
         try? FileManager.default.removeItem(at: preroll.recording.folder)
     }
 
-    /// The stops in progress, so quitting can wait until the files are written.
+    /// The stops in progress, and the calls being added from files, so quitting can wait until the
+    /// files are written.
     @ObservationIgnored private var stopping: Task<Void, Never>?
 
     func stopRecording() async {
@@ -511,6 +512,52 @@ enum IslandState: Equatable {
         } catch {
             log.error("Couldn't trim: \(error.localizedDescription, privacy: .public)")
             show(.problem(String(localized: "Couldn't trim the call: \(error.localizedDescription)")), for: .seconds(6))
+        }
+    }
+
+    /// Adds calls recorded elsewhere, dropped onto the library: each sound file or movie becomes a
+    /// call of its own under the file's name, with its sound copied in. The file stays where it was.
+    func add(_ files: [URL]) {
+        // Not the library's own calls dragged back in, which would then be in it twice.
+        let own = [RecordingStore.root, Recording.copies].map { $0.resolvingSymlinksInPath().path + "/" }
+        for file in files where UTType(filenameExtension: file.pathExtension)?.conforms(to: .audiovisualContent) == true
+            && !own.contains(where: file.resolvingSymlinksInPath().path.hasPrefix) {
+            // A quit waits for it, as for a call being saved: otherwise the call would stay without its sound.
+            stopping = Task { [previous = stopping] in
+                await add(file)
+                await previous?.value
+            }
+        }
+    }
+
+    private func add(_ file: URL) async {
+        let name = file.deletingPathExtension().lastPathComponent
+        var added: Recording?
+        do {
+            // Recorded when the file says, or else when the file was made.
+            let date = try? await AVURLAsset(url: file).load(.creationDate)?.load(.dateValue)
+            var recording = try store.create(app: nil, at: date ?? (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .now)
+            recording.title = name
+            added = recording
+            saving.insert(recording.id) // until its sound is in: not played, shared or trashed
+            store.save(recording)
+            selection = recording.id
+            try await RecordingStore.importSound(of: file, to: recording.finalAudioURL)
+            recording.duration = try await AVURLAsset(url: recording.finalAudioURL).load(.duration).seconds
+            guard recording.duration > 0 else { throw Failure("The file has no sound to play.") }
+            recording.title = store.recordings.first { $0.id == recording.id }?.title ?? recording.title // renamed meanwhile
+            store.save(recording)
+            saving.remove(recording.id)
+            log.notice("Added \(recording.id, privacy: .public) from a file, \(Int(recording.duration))s")
+            if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey) { transcribe(recording) }
+        } catch {
+            log.error("Couldn't add a file: \(error.localizedDescription, privacy: .public)")
+            if let added {
+                try? FileManager.default.removeItem(at: added.folder) // only what was copied in
+                saving.remove(added.id)
+                store.reload()
+            }
+            show(.problem(String(localized: "Couldn't add “\(name)”: \(error.localizedDescription)")), for: .seconds(6))
         }
     }
 

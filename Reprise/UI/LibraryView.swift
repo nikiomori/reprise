@@ -7,6 +7,7 @@ struct LibraryView: View {
     @State private var search = ""
     @FocusState private var listFocused: Bool
     @FocusState private var searchFocused: Bool
+    @State private var dropping = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.undoManager) private var undoManager
 
@@ -18,7 +19,7 @@ struct LibraryView: View {
                 ForEach(sections, id: \.title) { section in
                     Section(section.title) {
                         ForEach(section.recordings) { recording in
-                            RecordingRow(recording: recording, isLive: model.isLive(recording))
+                            RecordingRow(recording: recording, isLive: model.isLive(recording), isSaving: model.saving.contains(recording.id))
                                 .tag(recording.id)
                                 .contextMenu {
                                     ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
@@ -41,6 +42,14 @@ struct LibraryView: View {
             .overlay {
                 if !model.store.recordings.isEmpty, sections.isEmpty {
                     ContentUnavailableView.search(text: search)
+                }
+            }
+            // A recording made elsewhere, dropped from Finder, becomes a call of its own.
+            .dropDestination(for: URL.self) { files, _ in model.add(files) }
+            .onDropSessionUpdated { dropping = $0.localSession == nil && [.entering, .active].contains($0.phase) } // not a call dragged out
+            .overlay {
+                if dropping {
+                    RoundedRectangle(cornerRadius: 10).strokeBorder(.tint, lineWidth: 3).padding(4).allowsHitTesting(false)
                 }
             }
         } detail: {
@@ -110,6 +119,7 @@ struct LibraryView: View {
 private struct RecordingRow: View {
     let recording: Recording
     let isLive: Bool
+    let isSaving: Bool
 
     var body: some View {
         // Into Mail, Finder or another app, as from Finder; not while it's still being written.
@@ -123,7 +133,7 @@ private struct RecordingRow: View {
                 Text(recording.title).lineLimit(1)
                 Group {
                     if isLive {
-                        Text("\(recording.startedAt, format: .dateTime.hour().minute()) · \(Text("Recording").foregroundStyle(.red))")
+                        Text("\(recording.startedAt, format: .dateTime.hour().minute()) · \(isSaving ? Text("Saving…") : Text("Recording").foregroundStyle(.red))")
                     } else {
                         Text("\(recording.startedAt, format: .dateTime.hour().minute()) · \(recording.duration.clock)")
                     }

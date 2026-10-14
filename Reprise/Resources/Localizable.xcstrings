@@ -473,6 +473,22 @@
         }
       }
     },
+    "Couldn't add “%@”: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't add “%1$@”: %2$@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось добавить «%1$@»: %2$@"
+          }
+        }
+      }
+    },
     "Couldn't prepare the audio for upload." : {
       "localizations" : {
         "ru" : {
@@ -1914,6 +1930,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Загрузка не удалась. Повторите попытку позже."
+          }
+        }
+      }
+    },
+    "The file has no sound to play." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В файле нет звука."
           }
         }
       }
