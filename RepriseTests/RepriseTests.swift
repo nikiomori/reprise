@@ -696,6 +696,71 @@ struct EchoCancellerTests {
     }
 }
 
+/// The files' side of a recording, fed as the IO thread feeds it: 40 ms cycles at the device's rate.
+struct EncodingTests {
+    /// One cycle: a buffer for each file, each holding its value.
+    private func cycles(_ values: [Float], rate: Double) -> [AVAudioPCMBuffer] {
+        values.map { value in
+            let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!, frameCapacity: AVAudioFrameCount(rate / 25))!
+            buffer.frameLength = buffer.frameCapacity
+            buffer.floatChannelData![0].update(repeating: value, count: Int(buffer.frameLength))
+            return buffer
+        }
+    }
+
+    private func read(_ url: URL) throws -> [Float] {
+        let file = try AVAudioFile(forReading: url)
+        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))!
+        try file.read(into: buffer)
+        return Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+    }
+
+    /// The cycles in the order they came, and lost sound as silence where it was lost.
+    @Test func cyclesAndSilenceInOrder() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let encoding = Encoding(files: [try WAVWriter(url: url, rate: 48_000)])
+        encoding.use(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!)
+        for (value, lost) in [(0.25, 0.0), (0.5, 0.005), (-0.5, 0.1)] as [(Float, Double)] {
+            let cycle = cycles([value], rate: 48_000)
+            encoding.hand(cycle, frames: 1920, after: lost)
+        }
+        encoding.close()
+        let samples = try read(url), delay = AudioRecorder.encoderDelay
+        #expect(samples.count == delay + 3 * 1920 + 4800) // 5 ms is the clocks' jitter, not lost sound
+        #expect(samples[delay..<delay + 1920].allSatisfy { abs($0 - 0.25) < 0.001 })
+        #expect(samples[delay + 1920..<delay + 3840].allSatisfy { abs($0 - 0.5) < 0.001 })
+        #expect(samples[delay + 3840..<delay + 3840 + 4800].allSatisfy { $0 == 0 })
+        #expect(samples[(delay + 3840 + 4800)...].allSatisfy { abs($0 + 0.5) < 0.001 })
+    }
+
+    /// Ten seconds, encoded half a second at a time behind the cycles, and all of it in the file.
+    @Test func everythingHandedIsWritten() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let encoding = Encoding(files: [try WAVWriter(url: url, rate: 48_000)])
+        encoding.use(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!)
+        for n in 0..<250 { encoding.hand(cycles([Float(n) / 1000], rate: 48_000), frames: 1920, after: 0) }
+        encoding.close()
+        let samples = try read(url)
+        #expect(samples.count == AudioRecorder.encoderDelay + 250 * 1920)
+        #expect(abs(samples[AudioRecorder.encoderDelay + 249 * 1920] - 0.249) < 0.001)
+    }
+
+    /// A headset at 24 kHz into 48 kHz files, then a microphone at 48 kHz: a second each, two in the file.
+    @Test func aMicrophoneChangingRateKeepsTheLength() throws {
+        let urls = (0..<2).map { _ in FileManager.default.temporaryDirectory.appending(path: "reprise-\(UUID().uuidString).wav") }
+        defer { urls.forEach { try? FileManager.default.removeItem(at: $0) } }
+        let encoding = Encoding(files: try urls.map { try WAVWriter(url: $0, rate: 48_000) })
+        for rate in [24_000.0, 48_000] {
+            encoding.use(AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!)
+            for _ in 0..<25 { encoding.hand(cycles([0.3, -0.3], rate: rate), frames: Int(rate / 25), after: 0) }
+        }
+        encoding.close()
+        for url in urls { #expect(abs(try read(url).count - (AudioRecorder.encoderDelay + 96_000)) < 100) }
+    }
+}
+
 struct WAVWriterTests {
     /// Thirteen hours in, past what a WAV's sizes hold: the header says as much as it can.
     @Test func headerOfASidePast4GB() {

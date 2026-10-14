@@ -192,7 +192,7 @@ enum IslandState: Equatable {
     /// Warns once when that doesn't help (a full disk), no sound comes at all, or a call goes on
     /// without the other side (both usually a missing permission).
     private func watch(_ id: Recording.ID, _ audio: AudioRecorder) async {
-        var written = -1
+        var captured = -1
         var shown: String? // each warning once while it lasts, so another one still gets through
         var stalledBefore = false
         var healAfter = Self.healAfter
@@ -205,8 +205,8 @@ enum IslandState: Equatable {
                 self.session?.recording.movieStart = start
                 store.save(self.session!.recording)
             }
-            let now = audio.framesWritten
-            let stalled = tick > 0 && now == written
+            let now = audio.framesCaptured
+            let stalled = tick > 0 && now == captured
             let diskFull = audio.isWaitingForDisk
             let problem = tick == 0 ? nil
                 : !audio.hasHeardSound ? String(localized: "No sound is coming in. Check Privacy & Security.")
@@ -227,7 +227,7 @@ enum IslandState: Equatable {
                 }
             }
             stalledBefore = stalled
-            written = now
+            captured = now
             // The other side went quiet while the call app still plays: a tap that stopped delivering
             // (macOS 26.5 loses one now and then), or one on audio processes the app has since replaced.
             // A new tap on the app's processes as they are now; less and less often while that doesn't help.
