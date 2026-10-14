@@ -761,10 +761,7 @@ private struct TranscriptSection: View {
                 } else if let segments = model.store.segments(of: recording) {
                     Phrases(segments: segments, player: player, search: search)
                 } else if let text = model.store.transcript(of: recording) {
-                    Text(AttributedString(text, marking: search))
-                        .textSelection(.enabled)
-                        .lineSpacing(5)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Paragraphs(text: text, search: search)
                 } else if TranscriptionSettings.service != nil {
                     Button("Transcribe", systemImage: "text.bubble") { model.transcribe(recording) }
                         .buttonStyle(.glassProminent)
@@ -827,6 +824,47 @@ private struct Phrases: View {
                 .id(i) // where the search scrolls to
             }
         }
+    }
+}
+
+/// `transcript.txt` without the phrases' times, laid out a piece at a time as it scrolls into sight.
+/// As one Text, an hour of it took 45 MB and 3 G instructions to lay out, kept after the window closed.
+struct Paragraphs: View {
+    let text: String
+    let search: String
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(Self.pieces(of: text).enumerated()), id: \.offset) { _, piece in
+                Text(AttributedString(piece, marking: search))
+                    .textSelection(.enabled)
+                    .lineSpacing(5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    /// Its paragraphs, and a long one cut once it's past 1,000 characters: a service that gives only
+    /// text gives the whole call as one.
+    static func pieces(of text: String) -> [String] {
+        text.components(separatedBy: "\n\n").flatMap { $0.utf8.count > 1000 ? cut($0, after: .bySentences) : [$0] }
+    }
+
+    /// After a sentence, or after a word in a sentence that goes on and on (speech recognized without
+    /// punctuation).
+    private static func cut(_ text: String, after unit: String.EnumerationOptions) -> [String] {
+        var pieces: [String] = [], piece = ""
+        text.enumerateSubstrings(in: text.startIndex..., options: [unit, .substringNotRequired]) { _, _, range, _ in
+            let part = String(text[range])
+            if unit == .bySentences, part.utf8.count > 1000 {
+                if !piece.isEmpty { pieces.append(piece); piece = "" }
+                pieces += cut(part, after: .byWords)
+            } else {
+                piece += part
+                if piece.utf8.count >= 1000 { pieces.append(piece); piece = "" }
+            }
+        }
+        return piece.isEmpty ? pieces : pieces + [piece]
     }
 }
 

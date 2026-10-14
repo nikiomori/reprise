@@ -572,6 +572,19 @@ struct TranscriptTests {
         #expect(seconds.clock == shown)
     }
 
+    /// A transcript laid out in pieces: its paragraphs, a long one cut after its sentences, all of it kept.
+    @Test func longTranscriptComesInPieces() {
+        let long = (1...100).map { "Sentence number \($0) of the call, said at some length here." }.joined(separator: " ")
+        let text = "You: Short.\n\nOthers: " + long
+        let pieces = Paragraphs.pieces(of: text)
+        #expect(pieces.first == "You: Short.")
+        #expect(pieces.count > 4 && pieces.dropFirst().allSatisfy { $0.utf8.count < 1100 })
+        #expect(pieces.dropFirst().joined() == "Others: " + long)
+        // Without a sentence's end, cut after words.
+        let words = Array(repeating: "and then we went on talking", count: 200).joined(separator: " ")
+        #expect(Paragraphs.pieces(of: words).count > 4 && Paragraphs.pieces(of: words).joined() == words)
+    }
+
     @Test func searchMarksEveryMatch() {
         let marked = AttributedString("Ship it, then ship the éclair", marking: "SHIP")
         #expect(marked.runs.filter { $0.backgroundColor != nil }.map { String(marked[$0.range].characters) } == ["Ship", "ship"])
