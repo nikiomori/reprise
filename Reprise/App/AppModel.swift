@@ -360,9 +360,8 @@ enum IslandState: Equatable {
         default: show(.saved(recording), for: .seconds(5))
         }
         // After the save, and not waited for by a quit: the call is safe, this only improves it.
-        cancelEcho(in: recording)
-        Task {
-            await echoes[recording.id]?.value // the transcript and the shortcut get your side clean
+        // The transcript and the shortcut get your side clean.
+        cancelEcho(in: recording) { [self] in
             if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey), TranscriptionSettings.service != nil {
                 transcribe(recording, then: Shortcut.runAfterCall) // with its transcript
             } else {
@@ -377,19 +376,23 @@ enum IslandState: Equatable {
     // ponytail: a quit mid-cleaning leaves you-cleaned.m4a in the folder and your side as recorded;
     // nothing cleans it again. Redo it at launch if that turns out to matter.
     /// Takes the others' voices out of your side, where the microphone heard them from the speakers.
-    private func cancelEcho(in recording: Recording) {
-        guard let sides = recording.sides else { return }
+    /// At background priority, on the efficiency cores: measured, a seventh of the energy at utility's,
+    /// for three times as long. Waiting for it (a trim, a transcription asked for) raises it.
+    /// `then`: once it's done, at default priority. Not by waiting for it, which would raise it.
+    private func cancelEcho(in recording: Recording, then done: @escaping () -> Void) {
+        guard let sides = recording.sides else { return done() }
         let id = recording.id
-        echoes[id] = Task {
+        echoes[id] = Task(priority: .background) {
             let started = ContinuousClock.now
             do {
-                if try await Task.detached(priority: .utility, operation: { try EchoCanceller.clean(sides[0], against: sides[1]) }).value {
+                if try await Task.detached(priority: .background, operation: { try EchoCanceller.clean(sides[0], against: sides[1]) }).value {
                     log.notice("Took the others' echo out of your side of \(id, privacy: .public) in \(ContinuousClock.now - started)")
                 }
             } catch {
                 log.error("Couldn't clean your side of the echo: \(error.localizedDescription, privacy: .public)")
             }
             echoes[id] = nil
+            Task(priority: .medium) { done() }
         }
     }
 
