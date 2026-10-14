@@ -557,6 +557,12 @@ struct TranscriptTests {
     }
 
     /// As Find marks a document: every match, whatever its case and accents.
+    /// Times from a service are shown as they come: one no clock can show reads --:--, not a crash.
+    @Test(arguments: [(42.7, "0:42"), (3_725, "1:02:05"), (.nan, "--:--"), (.infinity, "--:--"), (1e30, "--:--")] as [(Double, String)])
+    func clockShowsAnyTime(seconds: Double, shown: String) {
+        #expect(seconds.clock == shown)
+    }
+
     @Test func searchMarksEveryMatch() {
         let marked = AttributedString("Ship it, then ship the éclair", marking: "SHIP")
         #expect(marked.runs.filter { $0.backgroundColor != nil }.map { String(marked[$0.range].characters) } == ["Ship", "ship"])

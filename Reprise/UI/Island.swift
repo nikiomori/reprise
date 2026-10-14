@@ -532,8 +532,10 @@ struct AppIcon: View {
 }
 
 extension TimeInterval {
-    /// 0:42, 12:05, 1:02:33
+    /// 0:42, 12:05, 1:02:33; --:-- for a time no clock shows. `Duration` traps on those (NaN, or a
+    /// phrase "said" at 1e30 s by a transcription service), and the call would crash the library each time it opened.
     var clock: String {
-        Duration.seconds(rounded(.down)).formatted(.time(pattern: self >= 3600 ? .hourMinuteSecond : .minuteSecond))
+        guard isFinite, abs(self) < 1e9 else { return "--:--" }
+        return Duration.seconds(rounded(.down)).formatted(.time(pattern: self >= 3600 ? .hourMinuteSecond : .minuteSecond))
     }
 }
