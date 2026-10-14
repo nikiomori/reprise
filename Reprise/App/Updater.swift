@@ -76,11 +76,7 @@ import Security
     private nonisolated static func latest() async throws -> Release {
         var request = URLRequest(url: URL(string: "https://api.github.com/repos/nikiomori/reprise/releases/latest")!)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        // A session of its own, gone with its connections once the answer is in: the shared one
-        // kept them, and a cache, for the rest of the day. 0.5 MB of a menu bar app waiting for calls.
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.urlCache = nil
-        let session = URLSession(configuration: configuration)
+        let session = URLSession.oneOff()
         defer { session.finishTasksAndInvalidate() }
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -114,5 +110,16 @@ import Security
               SecStaticCodeCreateWithPath(app as CFURL, [], &update) == errSecSuccess, let update,
               SecStaticCodeCheckValidity(update, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode), requirement) == errSecSuccess
         else { throw Failure("The download doesn't have the signature of this copy of Reprise. Download the update from GitHub.") }
+    }
+}
+
+extension URLSession {
+    /// A session of its own, gone with its connections once the answer is in: the shared one
+    /// kept them, and a cache, for the rest of the day. 0.5 MB of a menu bar app waiting for calls.
+    /// Done with it: `finishTasksAndInvalidate()`.
+    nonisolated static func oneOff() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration)
     }
 }

@@ -22,8 +22,10 @@ nonisolated struct TranscriptionService: Sendable {
     /// Whether Refrain answers on this Mac, for Settings to offer it. A second at most: it's
     /// local or it isn't there.
     static func refrainIsRunning() async -> Bool {
+        let session = URLSession.oneOff()
+        defer { session.finishTasksAndInvalidate() }
         guard let url = URL(string: refrain.baseURL)?.appending(path: "models"),
-              let (data, response) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 1)),
+              let (data, response) = try? await session.data(for: URLRequest(url: url, timeoutInterval: 1)),
               (response as? HTTPURLResponse)?.statusCode == 200
         else { return false }
         return String(decoding: data, as: UTF8.self).contains(#""owned_by":"refrain""#)
@@ -251,20 +253,33 @@ nonisolated enum Transcriber {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if let apiKey, !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
 
-        var body = Data()
+        var head = Data()
         func field(_ name: String, _ value: String) {
-            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8))
+            head.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8))
         }
         field("model", service.model)
         field("response_format", format.rawValue)
         if format == .diarized { field("chunking_strategy", "auto") } // OpenAI wants it past 30 seconds
         if let language, !language.isEmpty { field("language", language) }
         if !prompt.isEmpty { field("prompt", prompt) }
-        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".utf8))
-        body.append(try Data(contentsOf: file))
-        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        head.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".utf8))
 
-        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
+        // The body goes up from a file. Put together in memory, a call took two and a half times
+        // its size (38 MB for half an hour), kept for as long as the service took to answer.
+        let body = FileManager.default.temporaryDirectory.appending(path: "reprise-upload-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: body) }
+        guard FileManager.default.createFile(atPath: body.path, contents: head) else { throw CocoaError(.fileWriteUnknown) }
+        let out = try FileHandle(forWritingTo: body)
+        try out.seekToEnd()
+        // Mapped: read from the disk as it goes into the body, not into memory. Read in, though, from a
+        // library on a server, where a dropped connection would take a mapped file away mid-read.
+        try out.write(contentsOf: Data(contentsOf: file, options: .mappedIfSafe))
+        try out.write(contentsOf: Data("\r\n--\(boundary)--\r\n".utf8))
+        try out.close()
+
+        let session = URLSession.oneOff()
+        defer { session.finishTasksAndInvalidate() }
+        let (data, response) = try await session.upload(for: request, fromFile: body)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             // A service that can't time its text or tell voices apart turns the format down as a bad request.
