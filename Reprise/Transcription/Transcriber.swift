@@ -1,4 +1,5 @@
 import AVFoundation
+import Network
 import Security
 
 /// Any service that speaks the OpenAI `POST /audio/transcriptions` dialect:
@@ -31,10 +32,18 @@ nonisolated struct TranscriptionService: Sendable {
         return String(decoding: data, as: UTF8.self).contains(#""owned_by":"refrain""#)
     }
 
-    /// A server on this Mac, which takes a call whole rather than 10 minutes at a time.
-    // ponytail: loopback only; a server elsewhere on the network diarizes calls up to 10 minutes.
-    // Add private addresses if one should take long calls whole too.
-    var isLocal: Bool { ["localhost", "127.0.0.1", "::1"].contains(URL(string: baseURL)?.host() ?? "") }
+    /// A server on this Mac or the local network, which takes a call whole rather than 10 minutes at a time.
+    var isLocal: Bool {
+        guard let host = URL(string: baseURL)?.host()?.lowercased() else { return false }
+        if host == "localhost" || host.hasSuffix(".local") { return true }
+        if let ip = IPv4Address(host) {
+            let byte = [UInt8](ip.rawValue)
+            return ip.isLoopback || ip.isLinkLocal || byte[0] == 10
+                || (byte[0] == 172 && (16...31).contains(byte[1])) || (byte[0] == 192 && byte[1] == 168)
+        }
+        if let ip = IPv6Address(host) { return ip.isLoopback || ip.isLinkLocal || ip.isUniqueLocal }
+        return false
+    }
 
     /// Refrain takes hours in one request, so it never gets pieces: no re-encoding, no context lost at a cut.
     /// Other local servers may have limits of their own.
@@ -206,8 +215,8 @@ nonisolated enum Transcriber {
     ) async throws -> [Transcript.Segment] {
         let asset = AVURLAsset(url: audio)
         let duration = try await asset.load(.duration).seconds
-        // Voices keep their labels only within one request, so a call to diarize goes whole: to a
-        // server on this Mac at any length, to a cloud service only when it's one piece anyway.
+        // Voices keep their labels only within one request, so a call to diarize goes whole: to a server
+        // on this Mac or the local network at any length, to a cloud service only when it's one piece anyway.
         if format == .diarized, duration > chunk, !service.isLocal { throw Unsupported() }
         let length = format == .diarized || service.isRefrain ? duration : chunk
         var phrases: [Transcript.Segment] = []

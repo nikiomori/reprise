@@ -318,6 +318,15 @@ struct TranscriptionServiceTests {
     func completesTheServerAddress(baseURL: String, endpoint: String) {
         #expect(TranscriptionService(baseURL: baseURL, model: "").endpoint?.absoluteString == endpoint)
     }
+
+    @Test(arguments: [("http://localhost:8000/v1", true), ("http://127.0.0.1:8178/v1", true), ("http://[::1]:8000/v1", true),
+                      ("http://192.168.1.135:9001", true), ("http://10.0.0.5:8000/v1", true), ("http://172.20.1.1/v1", true),
+                      ("http://studio.local:8000/v1", true), ("http://[fd12::1]:8000/v1", true),
+                      ("http://172.32.1.1/v1", false), ("http://10.0.0.5.nip.io/v1", false), ("https://api.openai.com/v1", false),
+                      ("http://8.8.8.8/v1", false), ("http://[2001:db8::1]/v1", false), ("not a url", false)])
+    func takesCallsWholeOnThisMacAndTheLocalNetwork(baseURL: String, isLocal: Bool) {
+        #expect(TranscriptionService(baseURL: baseURL, model: "").isLocal == isLocal)
+    }
 }
 
 @MainActor struct RecordingStoreTests {
