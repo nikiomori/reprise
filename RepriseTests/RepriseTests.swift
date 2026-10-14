@@ -198,6 +198,26 @@ struct LevelerTests {
     }
 }
 
+@MainActor struct PlayerTests {
+    /// Made at the first play: a seek before it only says where that play starts.
+    @Test func firstPlayStartsWhereItWasSeeked() async throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-player-\(UUID()).caf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+        let silence = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 480_000)!
+        silence.frameLength = 480_000
+        try AVAudioFile(forWriting: url, settings: format.settings).write(from: silence)
+        let player = Player(url: url)
+        player.seek(to: 4)
+        #expect(player.time == 4)
+        player.avPlayer.volume = 0
+        player.toggle()
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(abs(player.avPlayer.currentTime().seconds - 4) < 1)
+        player.toggle()
+    }
+}
+
 struct WaveformTests {
     /// A short, silent file (what missing permissions produce) still fills every bar.
     @Test func silentShortFileHasAllBars() async throws {

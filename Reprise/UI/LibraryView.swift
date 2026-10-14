@@ -247,7 +247,7 @@ private struct RecordingDetail: View {
                     .disabled(model.isLive(recording))
             }
         }
-        .onDisappear { player?.avPlayer.pause() }
+        .onDisappear { player?.pause() }
     }
 
     /// The first phrase the search found, in sight and ready to play, as Find goes to the first match.
@@ -333,7 +333,10 @@ private struct LiveCard: View {
 // MARK: - Player
 
 @Observable final class Player {
-    let avPlayer: AVPlayer
+    private let url: URL
+    /// Made at the first play, or by a movie, which shows its picture at once. Made for each call
+    /// looked at, AVFoundation's playback took 2-3 MB, kept while the library stayed open, and after.
+    @ObservationIgnored private var made: AVPlayer?
     /// Only the wave's played part reads it, as often as it changes.
     private(set) var time: Double = 0 {
         didSet {
@@ -347,35 +350,46 @@ private struct LiveCard: View {
     private(set) var isPlaying = false
     var rate: Float = 1 {
         didSet {
-            avPlayer.defaultRate = rate // the video's own play button uses it too
-            if isPlaying { avPlayer.rate = rate }
+            made?.defaultRate = rate // the video's own play button uses it too
+            if isPlaying { made?.rate = rate }
         }
     }
     @ObservationIgnored private var observer: Any?
+    @ObservationIgnored private var loading: Task<Void, Never>?
 
     init(url: URL) {
-        avPlayer = AVPlayer(url: url)
-        Task {
-            duration = (try? await avPlayer.currentItem?.asset.load(.duration).seconds) ?? 0
+        self.url = url
+        loading = Task { duration = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0 }
+    }
+
+    var avPlayer: AVPlayer {
+        if let made { return made }
+        let player = AVPlayer(url: url)
+        player.defaultRate = rate
+        if time > 0 { player.seek(to: CMTime(seconds: time, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
+        made = player
+        Task { [loading] in
+            await loading?.value
             // As often as the playhead moves a pixel on a wave about 1400 wide, from 32 times a second to
             // once, and a fraction of a second, so the clocks still turn on the second. A 40-minute call
             // redrew the player 30 times a second: 6% CPU to play it.
             let intervals: [Double] = [1, 1 / 2, 1 / 4, 1 / 8, 1 / 16]
             let interval = intervals.first { $0 <= duration / 1400 } ?? 1 / 32
             // Also called when playback starts or stops — at the end, or from the video's own controls.
-            observer = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: interval, preferredTimescale: 600), queue: .main) { [weak self] time in
+            observer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: interval, preferredTimescale: 600), queue: .main) { [weak self] time in
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.time = time.seconds
-                    if self.isPlaying != (self.avPlayer.rate != 0) { self.isPlaying.toggle() }
+                    if self.isPlaying != (player.rate != 0) { self.isPlaying.toggle() }
                 }
             }
         }
+        return player
     }
 
     /// AVPlayer: an observer released without being removed is undefined behavior.
     isolated deinit {
-        if let observer { avPlayer.removeTimeObserver(observer) }
+        if let observer { made?.removeTimeObserver(observer) }
     }
 
     func toggle() {
@@ -384,9 +398,12 @@ private struct LiveCard: View {
         isPlaying ? avPlayer.playImmediately(atRate: rate) : avPlayer.pause()
     }
 
+    func pause() { made?.pause() }
+
+    /// Before the first play, only where it'll start.
     func seek(to seconds: Double) {
         time = seconds
-        avPlayer.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        made?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     func skip(_ seconds: Double) { seek(to: min(max(0, time + seconds), duration)) }
@@ -454,7 +471,7 @@ private struct PlayerCard: View {
             .buttonStyle(.glass)
             .help("Share this part as a file of its own")
             Button("Trim") {
-                player.avPlayer.pause()
+                player.pause()
                 Task { await model.trim(recording, to: part, undo: undoManager) }
             }
             .buttonStyle(.glassProminent)
