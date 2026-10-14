@@ -499,7 +499,8 @@ nonisolated final class ADTSWriter: SoundWriter {
 /// A side without compression, for editing: 16-bit PCM in a WAV whose header is rewritten with
 /// each write, so the file is whole however the recording ends and needs no repair. No encoder:
 /// cheaper than AAC, at 5.8 MB a minute.
-// ponytail: a WAV's sizes are 32-bit, so a side stops being valid past 4 GB, 12 hours at 48 kHz.
+// ponytail: a WAV's sizes are 32-bit, so past 4 GB, 12 hours at 48 kHz, a side's header says 4 GB;
+// players stop there. RF64 if calls ever run that long.
 nonisolated final class WAVWriter: SoundWriter {
     let format: AVAudioFormat
     private let handle: FileHandle
@@ -569,7 +570,8 @@ nonisolated final class WAVWriter: SoundWriter {
     static func header(rate: Int, frames: Int) -> Data {
         let bytes = frames * 2
         var header = Data()
-        let append = { (value: Int, size: Int) in withUnsafeBytes(of: UInt32(value).littleEndian) { header.append(contentsOf: $0.prefix(size)) } }
+        // Clamped: past 4 GB, `UInt32(value)` stopped the recording with a crash.
+        let append = { (value: Int, size: Int) in withUnsafeBytes(of: UInt32(clamping: value).littleEndian) { header.append(contentsOf: $0.prefix(size)) } }
         header.append(contentsOf: Array("RIFF".utf8)); append(36 + bytes, 4)
         header.append(contentsOf: Array("WAVEfmt ".utf8)); append(16, 4)
         append(1, 2); append(1, 2) // PCM, one channel

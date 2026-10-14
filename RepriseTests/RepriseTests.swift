@@ -682,6 +682,13 @@ struct EchoCancellerTests {
 }
 
 struct WAVWriterTests {
+    /// Thirteen hours in, past what a WAV's sizes hold: the header says as much as it can.
+    @Test func headerOfASidePast4GB() {
+        let header = WAVWriter.header(rate: 48_000, frames: 13 * 3600 * 48_000)
+        #expect(header.count == 44)
+        #expect(header.suffix(4) == Data([0xFF, 0xFF, 0xFF, 0xFF]))
+    }
+
     /// A second of a tone, 40 ms at a time, as the recorder hands it over.
     private func record(into url: URL, closing: Bool) throws -> WAVWriter {
         let writer = try WAVWriter(url: url, rate: 48_000)
