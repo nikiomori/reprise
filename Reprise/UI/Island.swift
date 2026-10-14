@@ -390,7 +390,8 @@ struct ElapsedTime: View {
 /// The logo's two dots, alive: the top one is you, the red one is everyone else.
 /// Each lights up when its side speaks, so a glance shows that both sides are recorded.
 ///
-/// Core Animation layers on a 15 Hz timer. As a SwiftUI timeline, every tick laid out and
+/// Core Animation layers on a 10 Hz timer: at 15, a third more wakeups and redraws of the glass for
+/// a difference the eye hardly catches. As a SwiftUI timeline, every tick laid out and
 /// redrew the whole island: 6% CPU for the whole call. Changing a layer's opacity costs nothing.
 struct VoiceDots: NSViewRepresentable {
     let levels: () -> (you: Float, them: Float)
@@ -429,7 +430,7 @@ struct VoiceDots: NSViewRepresentable {
         required init?(coder: NSCoder) { fatalError() }
 
         /// Ticks only while the dots can be seen: a call recorded with the display asleep or the
-        /// screen locked ticked 15 times a second for nobody.
+        /// screen locked ticked ten times a second for nobody.
         override func viewDidMoveToWindow() {
             NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
             if let window {
@@ -445,7 +446,7 @@ struct VoiceDots: NSViewRepresentable {
                 return
             }
             guard timer == nil else { return }
-            let timer = Timer(timeInterval: 1 / 15, repeats: true) { [weak self] _ in
+            let timer = Timer(timeInterval: 1 / 10, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.show() }
             }
             timer.tolerance = 0.01
@@ -473,9 +474,10 @@ struct VoiceDots: NSViewRepresentable {
         }
 
         /// Rises fast, falls slowly, like a VU meter, over a -50…0 dBFS window, where speech lives.
+        /// As fast a second as at 15 Hz: 0.6 and 0.12 of the way there a tick then.
         private static func follow(_ current: Double, _ peak: Float) -> Double {
             let target = peak > 0 ? min(1, max(0, (20 * log10(Double(peak)) + 50) / 50)) : 0
-            return current + (target - current) * (target > current ? 0.6 : 0.12)
+            return current + (target - current) * (target > current ? 0.75 : 0.17)
         }
     }
 }
