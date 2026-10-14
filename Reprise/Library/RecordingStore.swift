@@ -125,8 +125,7 @@ enum CalendarEvents {
     init() { reload() }
 
     func reload() {
-        transcripts.removeAll()
-        segments.removeAll()
+        forgetTranscripts()
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         // Not hidden ones: a call being trimmed is put together in one.
@@ -199,6 +198,12 @@ enum CalendarEvents {
         let participants = event.map(CalendarEvents.participants)
         return Recording(id: id, title: title, app: app, startedAt: date, duration: 0, hasVideo: false,
                          participants: participants?.isEmpty == false ? participants : nil)
+    }
+
+    /// Until they're asked for again: a search kept every call's transcript in memory.
+    func forgetTranscripts() {
+        transcripts.removeAll()
+        segments.removeAll()
     }
 
     func transcript(of recording: Recording) -> String? {

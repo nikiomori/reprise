@@ -82,6 +82,7 @@ struct LibraryView: View {
             if model.selection == nil { model.selection = model.store.recordings.first?.id }
             DispatchQueue.main.async { listFocused = true } // arrows browse calls right away
         }
+        .onDisappear { model.store.forgetTranscripts() } // read for the search and the calls opened; the window's gone
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.store.reload() // calls removed or added in Finder meanwhile
         }
