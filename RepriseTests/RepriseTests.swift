@@ -210,6 +210,19 @@ struct WaveformTests {
         let peaks = await Waveform.peaks(of: url, count: 120)
         #expect(peaks.count == 120)
     }
+
+    /// A bar longer than a read is put together from several, and is its own part's loudness.
+    @Test func longBarsAreTheirOwnPartsLoudness() async throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-bars-\(UUID()).caf")
+        defer { [url, url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).waveform")].forEach { try? FileManager.default.removeItem(at: $0) } }
+        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 200_001)!
+        buffer.frameLength = 200_001 // a frame past the bars, left out
+        for i in 0..<200_001 { buffer.floatChannelData![0][i] = (i < 100_000 ? 0.1 : 0.4) * sin(Float(i) * 0.05) }
+        try AVAudioFile(forWriting: url, settings: format.settings).write(from: buffer)
+        let peaks = await Waveform.peaks(of: url, count: 2)
+        #expect(peaks.count == 2 && abs(peaks[0] - 0.5) < 0.01 && peaks[1] == 1) // a quarter as loud, under the square root
+    }
 }
 
 struct EncoderDelayTests {

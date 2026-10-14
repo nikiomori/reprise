@@ -1,4 +1,5 @@
 import AVKit
+import Accelerate
 import SwiftUI
 
 struct LibraryView: View {
@@ -694,15 +695,18 @@ nonisolated enum Waveform {
             return data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
         }
         guard let file = try? AVAudioFile(forReading: url), file.length > 0 else { return [] }
-        let perBucket = AVAudioFrameCount(max(1, file.length / Int64(count)))
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: perBucket) else { return [] }
+        let perBucket = max(1, Int(file.length) / count)
+        // A bar read a second at a time: read whole, a bar of an hour and a half's call was 8.6 MB.
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(min(perBucket, 1 << 16))) else { return [] }
         var peaks: [Float] = []
-        while peaks.count < count, (try? file.read(into: buffer, frameCount: perBucket)) != nil, buffer.frameLength > 0 {
+        var energy: Float = 0, frames = 0 // of the bar being read
+        while peaks.count < count, (try? file.read(into: buffer, frameCount: AVAudioFrameCount(min(perBucket - frames, Int(buffer.frameCapacity))))) != nil, buffer.frameLength > 0 {
             guard !Task.isCancelled else { return [] } // the next call was selected before this one's wave was done
-            let samples = UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))
-            let rms = (samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
-            peaks.append(rms)
+            energy += vDSP.sumOfSquares(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+            frames += Int(buffer.frameLength)
+            if frames == perBucket { peaks.append((energy / Float(frames)).squareRoot()); (energy, frames) = (0, 0) }
         }
+        if frames > 0, peaks.count < count { peaks.append((energy / Float(frames)).squareRoot()) } // the end, short of a bar
         peaks += Array(repeating: 0, count: count - peaks.count)
         let loudest = peaks.max() ?? 0
         if loudest > 0 { peaks = peaks.map { ($0 / loudest).squareRoot() } }
