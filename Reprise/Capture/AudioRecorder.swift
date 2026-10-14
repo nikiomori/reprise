@@ -86,6 +86,11 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
     /// say so: every player puts the first recorded frame 44 ms (at 48 kHz) into the file.
     static let encoderDelay = 2112
 
+    /// The files' rate for a microphone's. One at 88.2 kHz or more is brought down to 48: AAC has
+    /// no 176.4 or 192 kHz, so such a microphone recorded nothing at all, and at 96 kHz the encoder
+    /// did twice the work, and the sides took twice the space, for sound a voice doesn't have.
+    static func fileRate(for rate: Double) -> Double { min(rate, 48_000) }
+
     static func fileSettings(rate: Double) -> [String: Any] {
         [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
@@ -188,11 +193,12 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
             let range = deviceID.get(kAudioDevicePropertyBufferFrameSizeRange, AudioValueRange())
             deviceID.set(kAudioDevicePropertyBufferFrameSize, UInt32(min(rate / 25, range.mMaximum)))
             if files.isEmpty {
+                let fileRate = Self.fileRate(for: rate)
                 // The file's time zero lies before the first IO cycle: the drift-compensated tap hands over
                 // the Mac's sound late (2399 frames, 50 ms, on a MacBook), and then comes the encoder delay.
                 let tapLatency = deviceID.ids(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput).map { $0.get(kAudioStreamPropertyLatency, UInt32(0)) }.max() ?? 0
-                lead = UInt64(Double(Int(tapLatency) + Self.encoderDelay) / rate * 1e9)
-                files = try ([url] + sideURLs).map { $0.pathExtension == "wav" ? try WAVWriter(url: $0, rate: rate) as any SoundWriter : try ADTSWriter(url: $0, rate: rate) }
+                lead = UInt64((Double(tapLatency) / rate + Double(Self.encoderDelay) / fileRate) * 1e9)
+                files = try ([url] + sideURLs).map { $0.pathExtension == "wav" ? try WAVWriter(url: $0, rate: fileRate) as any SoundWriter : try ADTSWriter(url: $0, rate: fileRate) }
             }
             let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
             let fileFormat = files[0].format

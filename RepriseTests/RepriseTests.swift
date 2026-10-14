@@ -232,24 +232,35 @@ struct EncoderDelayTests {
     }
 
     /// A microphone at another rate, resampled to the file's as it's recorded: 5 s in, 5 s in the file.
-    @Test func aMicrophoneAtAnotherRateKeepsItsLength() throws {
+    /// A headset's 24 kHz goes up to the file's 48; a studio interface's 192 kHz comes down to them.
+    @Test(arguments: [(24_000, 48_000), (192_000, AudioRecorder.fileRate(for: 192_000))] as [(Double, Double)])
+    func aMicrophoneAtAnotherRateKeepsItsLength(rate: Double, fileRate: Double) throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "reprise-rate-\(UUID()).aac")
         defer { try? FileManager.default.removeItem(at: url) }
-        let writer = try ADTSWriter(url: url, rate: 48_000)
-        let mic = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
+        let writer = try ADTSWriter(url: url, rate: fileRate)
+        let mic = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
         let converter = AVAudioConverter(from: mic, to: writer.format)!
-        let cycle = AVAudioPCMBuffer(pcmFormat: mic, frameCapacity: 960)!
-        cycle.frameLength = 960
+        let frames = Int(rate / 25)
+        let cycle = AVAudioPCMBuffer(pcmFormat: mic, frameCapacity: AVAudioFrameCount(frames))!
+        cycle.frameLength = AVAudioFrameCount(frames)
         let resampled = AVAudioPCMBuffer(pcmFormat: writer.format, frameCapacity: 4096)!
         for c in 0..<125 { // 40 ms each
-            for i in 0..<960 { cycle.floatChannelData![0][i] = 0.3 * sin(Float(c * 960 + i) * 0.1) }
+            for i in 0..<frames { cycle.floatChannelData![0][i] = 0.3 * sin(Float(c * frames + i) * 0.1 * 24_000 / Float(rate)) }
             try AudioRecorder.convert(cycle, with: converter, into: resampled)
             try writer.encode(resampled)
             _ = writer.writeIfDue()
         }
         writer.close()
-        let seconds = Double(try AVAudioFile(forReading: url).length) / 48_000
+        let seconds = Double(try AVAudioFile(forReading: url).length) / fileRate
         #expect(abs(seconds - 5) < 0.1)
+    }
+
+    /// Every rate a microphone runs at gets files: AAC goes no higher than 96 kHz.
+    @Test(arguments: [8_000.0, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000, 88_200, 96_000, 176_400, 192_000, 384_000])
+    func everyMicrophoneRateIsRecorded(rate: Double) throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "reprise-rate-\(UUID()).aac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(try ADTSWriter(url: url, rate: AudioRecorder.fileRate(for: rate)).format.sampleRate <= 48_000)
     }
 
     /// The same bytes AVAudioFile writes, whatever the IO cycles' sizes and however often it writes.
