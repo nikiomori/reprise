@@ -399,7 +399,11 @@ private struct PlayerCard: View {
             WaveformScrubber(player: player, source: recording.audioURL)
                 .frame(height: 64)
                 .overlay {
-                    if let part = Binding($part) { PartFrame(part: part, duration: player.duration, marks: marks) }
+                    // Not `Binding($part)`: Cancel crashed it, the frame being drawn once more after
+                    // `part` was gone and its force-unwrapping binding read nil.
+                    if let shown = part {
+                        PartFrame(part: Binding { part ?? shown } set: { part = $0 }, duration: player.duration, marks: marks)
+                    }
                 }
             if let part {
                 partBar(part)
