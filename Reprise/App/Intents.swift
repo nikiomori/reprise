@@ -94,24 +94,28 @@ struct CallEntity: IndexedEntity {
     }
 }
 
+/// Each entity reads its call's transcript, so only the calls asked for become entities: Spotlight
+/// opening one call read the whole library's.
 nonisolated struct CallQuery: EnumerableEntityQuery, EntityStringQuery {
     @MainActor func entities(for identifiers: [CallEntity.ID]) async throws -> [CallEntity] {
-        calls { identifiers.contains($0.id) }
+        entities(saved.filter { identifiers.contains($0.id) })
     }
 
     @MainActor func entities(matching string: String) async throws -> [CallEntity] {
-        calls { [$0.title, $0.transcript].contains { $0.localizedStandardContains(string) } || $0.participants.contains { $0.localizedStandardContains(string) } }
+        entities(saved).filter { [$0.title, $0.transcript].contains { $0.localizedStandardContains(string) } || $0.participants.contains { $0.localizedStandardContains(string) } }
     }
 
-    @MainActor func suggestedEntities() async throws -> [CallEntity] { Array(calls { _ in true }.prefix(10)) }
+    @MainActor func suggestedEntities() async throws -> [CallEntity] { entities(Array(saved.prefix(10))) }
 
-    @MainActor func allEntities() async throws -> [CallEntity] { calls { _ in true } }
+    @MainActor func allEntities() async throws -> [CallEntity] { entities(saved) }
 
-    /// Saved ones, newest first: a call still being recorded has nothing to open or read yet.
-    @MainActor private func calls(where included: (CallEntity) -> Bool) -> [CallEntity] {
+    /// Newest first: a call still being recorded has nothing to open or read yet.
+    @MainActor private var saved: [Recording] {
         let model = AppModel.shared
-        return model.store.recordings.filter { !model.isLive($0) }.map { model.store.entity(of: $0) }.filter(included)
+        return model.store.recordings.filter { !model.isLive($0) }
     }
+
+    @MainActor private func entities(_ recordings: [Recording]) -> [CallEntity] { recordings.map(AppModel.shared.store.entity) }
 }
 
 /// Opens a call in the library: from Spotlight, or from a shortcut.

@@ -140,7 +140,11 @@ enum CalendarEvents {
         updateSpotlight()
     }
 
-    func entity(of recording: Recording) -> CallEntity { CallEntity(recording, transcript: transcript(of: recording)) }
+    /// With its transcript read for it, not kept: Spotlight and Shortcuts ask in the background,
+    /// and kept, the transcripts of every call they asked about stayed in memory.
+    func entity(of recording: Recording) -> CallEntity {
+        CallEntity(recording, transcript: transcripts[recording.id] ?? (try? String(contentsOf: recording.transcriptURL, encoding: .utf8)))
+    }
 
     // MARK: Spotlight
 
@@ -159,7 +163,6 @@ enum CalendarEvents {
         guard !new.isEmpty || !gone.isEmpty else { return }
         UserDefaults.standard.set(recordings.map(\.id), forKey: Self.indexedKey)
         let entities = new.map(entity)
-        transcripts.removeAll() // read for the index only; the library reads its own as it needs them
         Task {
             try? await CSSearchableIndex.default().deleteAppEntities(identifiedBy: Array(gone), ofType: CallEntity.self)
             try? await CSSearchableIndex.default().indexAppEntities(entities)
