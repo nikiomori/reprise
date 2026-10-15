@@ -403,7 +403,8 @@ nonisolated final class Encoding: @unchecked Sendable {
         handed.withLock { swap(&$0, &taken) }
         for (index, file) in files.enumerated() {
             var from = 0
-            for (at, seconds) in taken.silences + [(taken.sound[index].count, 0)] {
+            for gap in 0...taken.silences.count { // each silence, then the end
+                let (at, seconds) = gap < taken.silences.count ? taken.silences[gap] : (taken.sound[index].count, 0)
                 // A piece the encoder turns down still takes its time, as silence.
                 if at > from, (try? encode(taken.sound[index][from..<at], into: index)) == nil {
                     writeSilence(Double(at - from) / rate, to: file)
