@@ -110,6 +110,11 @@ If you save each side, Reprise transcribes each one on its own, so the transcrip
 
 A service that tells voices apart (`diarized_json`, such as Refrain with its speaker model downloaded, OpenAI's `gpt-4o-transcribe-diarize` or a self-hosted server) also splits the others into Speaker 1, Speaker 2 and so on, and labels a call recorded without its sides. It labels the voices anew in every request, so Reprise sends the call whole: to a server on this Mac or your local network at any length, to a cloud service only up to 10 minutes. Click a voice's name to name it, after someone invited to the call or as you like; the transcript, Copy and search use the name.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/transcript-dark.png">
+  <img src="docs/media/transcript-light.png" width="620" alt="A transcript split by voice: You, Anna, Speaker 2, each with its own color and the time it begins">
+</picture>
+
 ## Files
 
 Each call is a folder in `~/Movies/Reprise`:
