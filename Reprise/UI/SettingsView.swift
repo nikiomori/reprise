@@ -17,6 +17,9 @@ struct SettingsView: View {
             Tab("Apps", systemImage: "app.badge.checkmark", value: .apps) { AppsSettings() }
             Tab("Transcription", systemImage: "text.bubble", value: .transcription) { TranscriptionSettingsView() }
         }
+        // Checkboxes, as in Safari's and Mail's settings: switches had macOS render their glass,
+        // 307 MB at the window's opening for a moment, and 3 MB more kept after it closed.
+        .toggleStyle(.checkbox)
         .frame(width: 540)
         .frame(maxHeight: 720) // a long list of apps scrolls instead of outgrowing the screen
         .fixedSize(horizontal: false, vertical: true) // each tab as tall as its content, like Apple's settings windows
