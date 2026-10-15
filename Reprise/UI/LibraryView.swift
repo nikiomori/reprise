@@ -399,8 +399,9 @@ private struct LiveCard: View {
         player.defaultRate = rate
         if time > 0 { player.seek(to: CMTime(seconds: time, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
         made = player
-        Task { [loading] in
+        Task { [weak self, loading] in
             await loading?.value
+            guard let self else { return } // the call was left while its wave loaded
             // As often as the playhead moves a pixel on a wave about 1400 wide, from 32 times a second to
             // once, and a fraction of a second, so the clocks still turn on the second. A 40-minute call
             // redrew the player 30 times a second: 6% CPU to play it.
