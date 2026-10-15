@@ -333,8 +333,9 @@ nonisolated final class Encoding: @unchecked Sendable {
     private let handed: Mutex<Handover>
     /// The encoders' side of the swap, so the IO thread's arrays keep their room. Only on `queue`.
     private var taken: Handover
-    /// At the device's rate, and through a resampler when that isn't the files' rate. Only on `queue`.
+    /// When the device's rate isn't the files': its sound a piece at a time through a resampler. Only on `queue`.
     private var pieces: [AVAudioPCMBuffer] = [], converters: [AVAudioConverter?] = [], resampled: [AVAudioPCMBuffer?] = []
+    private var rate: Double = 48_000 // the device's; only on `queue`
     /// The IO thread's: frames handed over since it last asked for them to be encoded, and how many
     /// make a quarter of a second.
     private var sinceAsked = 0, quarter = 12_000
@@ -355,7 +356,8 @@ nonisolated final class Encoding: @unchecked Sendable {
             drain() // what came at the old rate, through the old resamplers
             let fileFormat = files[0].format
             let resampling = format.sampleRate != fileFormat.sampleRate
-            pieces = files.map { _ in AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4096)! }
+            rate = format.sampleRate
+            pieces = resampling ? files.map { _ in AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4096)! } : []
             // One per file, as each keeps its state from piece to piece.
             converters = files.map { _ in resampling ? AVAudioConverter(from: format, to: fileFormat) : nil }
             resampled = files.map { _ in resampling ? AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(4096 * fileFormat.sampleRate / format.sampleRate) + 64) : nil }
@@ -404,7 +406,7 @@ nonisolated final class Encoding: @unchecked Sendable {
             for (at, seconds) in taken.silences + [(taken.sound[index].count, 0)] {
                 // A piece the encoder turns down still takes its time, as silence.
                 if at > from, (try? encode(taken.sound[index][from..<at], into: index)) == nil {
-                    writeSilence(Double(at - from) / pieces[index].format.sampleRate, to: file)
+                    writeSilence(Double(at - from) / rate, to: file)
                 }
                 writeSilence(seconds, to: file)
                 from = at
@@ -417,6 +419,16 @@ nonisolated final class Encoding: @unchecked Sendable {
     }
 
     private func encode(_ sound: ArraySlice<Float>, into index: Int) throws {
+        guard let converter = converters[index], let resampled = resampled[index] else {
+            // At the files' rate: straight from the handed sound, in one go. Copied into pieces, each
+            // piece was a call into the encoder, and each call six allocations inside it.
+            return try sound.withUnsafeBufferPointer { samples in
+                var list = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(
+                    mNumberChannels: 1, mDataByteSize: UInt32(samples.count * MemoryLayout<Float>.size), mData: UnsafeMutableRawPointer(mutating: samples.baseAddress)))
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: files[index].format, bufferListNoCopy: &list) else { throw CocoaError(.fileWriteUnknown) }
+                try files[index].encode(buffer)
+            }
+        }
         let piece = pieces[index]
         var rest = sound
         while !rest.isEmpty {
@@ -424,12 +436,8 @@ nonisolated final class Encoding: @unchecked Sendable {
             rest.prefix(count).withUnsafeBufferPointer { piece.floatChannelData![0].update(from: $0.baseAddress!, count: count) }
             piece.frameLength = AVAudioFrameCount(count)
             rest = rest.dropFirst(count)
-            if let converter = converters[index], let resampled = resampled[index] {
-                try AudioRecorder.convert(piece, with: converter, into: resampled)
-                try files[index].encode(resampled)
-            } else {
-                try files[index].encode(piece)
-            }
+            try AudioRecorder.convert(piece, with: converter, into: resampled)
+            try files[index].encode(resampled)
         }
     }
 

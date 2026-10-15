@@ -832,6 +832,29 @@ struct EncodingTests {
         #expect(abs(samples[AudioRecorder.encoderDelay + 249 * 1920] - 0.249) < 0.001)
     }
 
+    /// Encoded straight from the handed sound, in quarter seconds: the sound a writer fed cycle by cycle
+    /// writes, to the same length. Not the same bytes: the encoder rounds a little differently with how
+    /// much it gets at a time (-99 dB). A sample lost or doubled would be 0 dB.
+    @Test func encodesWhatAWriterFedDirectlyWrites() throws {
+        let urls = (0..<2).map { _ in FileManager.default.temporaryDirectory.appending(path: "reprise-\(UUID().uuidString).aac") }
+        defer { urls.forEach { try? FileManager.default.removeItem(at: $0) } }
+        let encoding = Encoding(files: [try ADTSWriter(url: urls[0], rate: 48_000)])
+        let direct = try ADTSWriter(url: urls[1], rate: 48_000)
+        encoding.use(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!)
+        let cycle = cycles([0], rate: 48_000)
+        for n in 0..<75 { // three seconds
+            for i in 0..<1920 { cycle[0].floatChannelData![0][i] = 0.3 * sin(Float(n * 1920 + i) * 0.02) }
+            encoding.hand(cycle, frames: 1920, after: 0)
+            try direct.encode(cycle[0])
+        }
+        encoding.close()
+        direct.close()
+        let (handed, fed) = (try read(urls[0]), try read(urls[1]))
+        #expect(handed.count == fed.count)
+        let apart = zip(handed, fed).reduce(Float(0)) { $0 + ($1.0 - $1.1) * ($1.0 - $1.1) }, loud = fed.reduce(Float(0)) { $0 + $1 * $1 }
+        #expect(apart < loud * 1e-6) // 60 dB under the sound
+    }
+
     /// A headset at 24 kHz into 48 kHz files, then a microphone at 48 kHz: a second each, two in the file.
     @Test func aMicrophoneChangingRateKeepsTheLength() throws {
         let urls = (0..<2).map { _ in FileManager.default.temporaryDirectory.appending(path: "reprise-\(UUID().uuidString).wav") }
