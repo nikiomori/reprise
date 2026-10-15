@@ -1,6 +1,7 @@
 import AVFoundation
 import Network
 import Security
+import Synchronization
 
 /// Any service that speaks the OpenAI `POST /audio/transcriptions` dialect:
 /// Refrain, OpenAI, Groq, Mistral, or a local whisper server (speaches, whisper.cpp, LocalAI…).
@@ -228,6 +229,15 @@ nonisolated enum Transcriber {
     /// it), phrases with times (`verbose_json`), or text (`json`).
     private enum Format: String { case diarized = "diarized_json", timed = "verbose_json", text = "json" }
 
+    /// The formats a cloud service turned down since launch, by endpoint and model: each call to it
+    /// uploaded a piece only to be turned down again, up to twice. Not a service on this Mac or the
+    /// local network, which costs nothing to ask, and Refrain tells voices apart once its model is in.
+    private static let turnedDown = Mutex<Set<String>>([])
+
+    private static func key(_ format: Format, _ service: TranscriptionService) -> String? {
+        service.isLocal ? nil : "\(service.baseURL) \(service.model) \(format.rawValue)"
+    }
+
     /// Long recordings are split into 10-minute pieces to stay under the
     /// 25 MB / duration limits most providers enforce.
     private static let chunk: Double = 600
@@ -243,6 +253,7 @@ nonisolated enum Transcriber {
         // Voices keep their labels only within one request, so a call to diarize goes whole: to a server
         // on this Mac or the local network at any length, to a cloud service only when it's one piece anyway.
         if format == .diarized, duration > chunk, !service.isLocal { throw Unsupported() }
+        if let key = key(format, service), turnedDown.withLock({ $0.contains(key) }) { throw Unsupported() }
         let length = format == .diarized || service.isRefrain ? duration : chunk
         var phrases: [Transcript.Segment] = []
         var start: Double = 0
@@ -317,7 +328,10 @@ nonisolated enum Transcriber {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             // A service that can't time its text or tell voices apart turns the format down as a bad request.
-            if format != .text, [400, 422].contains(status) { throw Unsupported() }
+            if format != .text, [400, 422].contains(status) {
+                if let key = key(format, service) { _ = turnedDown.withLock { $0.insert(key) } }
+                throw Unsupported()
+            }
             let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error.message
                 ?? String(data: data, encoding: .utf8)?.prefix(300).description
             throw Failure("The service answered \(status): \(message ?? String(localized: "no details")).")
