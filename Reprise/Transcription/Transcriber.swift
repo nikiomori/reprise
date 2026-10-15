@@ -87,7 +87,8 @@ enum TranscriptionSettings {
 
 /// `transcript.json`: what was said, phrase by phrase. `start` and `end` are seconds into the call;
 /// `speaker` is "you" or "them", from the side it was heard on, or "1", "2"… for the voices a
-/// service told apart; none when nothing tells who.
+/// service told apart; none when nothing tells who. `names`: what the voices were called in the
+/// library, `"1": "Anna"`; none until one is.
 nonisolated struct Transcript: Codable {
     nonisolated struct Segment: Codable, Equatable {
         var speaker: String?
@@ -97,12 +98,30 @@ nonisolated struct Transcript: Codable {
     }
 
     var segments: [Segment]
+    var names: [String: String]?
 
     /// For `transcript.txt`, which search, Copy and the shortcut after a call read: a paragraph each
     /// time the speaker changes, "You: …".
     var text: String {
-        turns.map { turn in Self.name(of: turn.speaker).map { "\($0): \(turn.text)" } ?? turn.text }
+        turns.map { turn in name(of: turn.speaker).map { "\($0): \(turn.text)" } ?? turn.text }
             .joined(separator: "\n\n")
+    }
+
+    /// The phrases as the library shows them: a paragraph each time the speaker changes, and a long
+    /// one cut after a phrase once it's past 1,000 characters, to be laid out a piece at a time.
+    var paragraphs: [Range<Int>] {
+        var paragraphs: [Range<Int>] = []
+        var length = 0
+        for (i, segment) in segments.enumerated() {
+            if let last = paragraphs.last, segments[last.lowerBound].speaker == segment.speaker, length < 1000 {
+                paragraphs[paragraphs.count - 1] = last.lowerBound..<i + 1
+                length += segment.text.utf8.count
+            } else {
+                paragraphs.append(i..<i + 1)
+                length = segment.text.utf8.count
+            }
+        }
+        return paragraphs
     }
 
     /// The phrases joined until the speaker changes, each turn from when it began.
@@ -118,7 +137,13 @@ nonisolated struct Transcript: Codable {
         return turns
     }
 
-    static func name(of speaker: String?) -> String? {
+    /// The name the voice was given, or else its label.
+    func name(of speaker: String?) -> String? {
+        speaker.flatMap { names?[$0] } ?? Self.label(of: speaker)
+    }
+
+    /// What a voice goes by until it's named.
+    static func label(of speaker: String?) -> String? {
         switch speaker {
         case "you": String(localized: "You")
         case "them": String(localized: "Others")

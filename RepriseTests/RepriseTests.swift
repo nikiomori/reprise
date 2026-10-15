@@ -435,6 +435,20 @@ struct TranscriptionServiceTests {
         #expect(brief.hasSuffix("## Transcript\n\n[0:01] You: Hi all\n\n[1:01] Speaker 1: Ship it"))
     }
 
+    /// A voice named in the library is named in the text that search, Copy and Spotlight read; a
+    /// blank name gives it back its label.
+    @Test func namedVoiceIsNamedInTheText() throws {
+        let recording = try store.create(app: nil, at: .now)
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        let segments = [("you", 1.0, "Hi"), ("1", 3, "Hello")].map { Transcript.Segment(speaker: $0, start: $1, end: $1 + 1, text: $2) }
+        try JSONEncoder().encode(Transcript(segments: segments)).write(to: recording.segmentsURL)
+        store.save(recording)
+        store.rename(voice: "1", to: " Anna ", in: recording)
+        #expect(store.transcript(of: recording) == "You: Hi\n\nAnna: Hello")
+        store.rename(voice: "1", to: " ", in: recording)
+        #expect(store.transcript(of: recording) == "You: Hi\n\nSpeaker 1: Hello" && store.phrases(of: recording)?.names == nil)
+    }
+
     /// A library folder renamed in Finder is still the library; one deleted is gone.
     @Test func libraryFolderFollowsARename() throws {
         let scratch = FileManager.default.temporaryDirectory.appending(path: "reprise-library-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -457,7 +471,7 @@ struct TranscriptionServiceTests {
         recording.duration = 2
         recording.marks = [0.2, 1.2]
         let segments = [("you", 0.1, "Before"), ("1", 0.9, "Inside"), ("you", 1.4, "Across")].map { Transcript.Segment(speaker: $0, start: $1, end: $1 + 0.3, text: $2) }
-        try JSONEncoder().encode(Transcript(segments: segments)).write(to: recording.segmentsURL)
+        try JSONEncoder().encode(Transcript(segments: segments, names: ["1": "Anna"])).write(to: recording.segmentsURL)
         store.save(recording)
 
         let trashed = try await store.trim(recording, to: 0.5...1.5)
@@ -465,8 +479,10 @@ struct TranscriptionServiceTests {
         let cut = try #require(store.recordings.first { $0.id == recording.id })
         #expect(cut.duration == 1 && cut.marks == [0.7])
         #expect(abs(try await AVURLAsset(url: cut.finalAudioURL).load(.duration).seconds - 1) < 0.05)
-        #expect(store.segments(of: cut)?.map(\.text) == ["Inside", "Across"])
-        #expect(store.segments(of: cut)?.map(\.start) == [0.4, 0.9] && store.segments(of: cut)?.last?.end == 1)
+        let phrases = try #require(store.phrases(of: cut))
+        #expect(phrases.segments.map(\.text) == ["Inside", "Across"])
+        #expect(phrases.segments.map(\.start) == [0.4, 0.9] && phrases.segments.last?.end == 1)
+        #expect(store.transcript(of: cut) == "Anna: Inside\n\nYou: Across") // the voices keep their names
         #expect(FileManager.default.fileExists(atPath: trashed.appending(path: "audio.m4a").path))
     }
 
@@ -612,6 +628,13 @@ struct TranscriptTests {
         #expect(Transcriber.merge(you: [], them: [phrase("A", 1, "Hello")]).segments.map(\.speaker) == ["them"])
         #expect(Transcriber.numbered([phrase("A", 1, "Hello")], alone: nil).map(\.speaker) == [nil])
         #expect(Transcript(segments: [phrase(nil, 1, "Hello"), phrase(nil, 3, "there")]).text == "Hello there")
+    }
+
+    /// Shown a paragraph each time the speaker changes, and a long one cut after a phrase.
+    @Test func paragraphsFollowTheSpeakers() {
+        let long = String(repeating: "word ", count: 120) // 600 characters
+        let segments = [phrase("you", 1, "Hi"), phrase("you", 2, "all"), phrase("1", 3, long), phrase("1", 4, long), phrase("1", 5, long), phrase("you", 6, "Bye")]
+        #expect(Transcript(segments: segments).paragraphs == [0..<2, 2..<4, 4..<5, 5..<6])
     }
 
     /// As Find marks a document: every match, whatever its case and accents.

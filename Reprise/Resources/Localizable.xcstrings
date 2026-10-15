@@ -1008,6 +1008,16 @@
         }
       }
     },
+    "Name" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Имя"
+          }
+        }
+      }
+    },
     "Name calls after calendar events" : {
       "localizations" : {
         "ru" : {
@@ -1544,6 +1554,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Убрать из избранного"
+          }
+        }
+      }
+    },
+    "Rename" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переименовать"
+          }
+        }
+      }
+    },
+    "Rename “%@”" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переименовать «%@»"
+          }
+        }
+      }
+    },
+    "Rename…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переименовать…"
           }
         }
       }

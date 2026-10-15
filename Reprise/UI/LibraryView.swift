@@ -272,10 +272,11 @@ private struct RecordingDetail: View {
 
     /// The first phrase the search found, in sight and ready to play, as Find goes to the first match.
     private func find(_ scroller: ScrollViewProxy) {
-        guard !search.isEmpty, let segments = model.store.segments(of: recording),
-              let first = segments.firstIndex(where: { $0.text.localizedStandardContains(search) }) else { return }
-        if player?.isPlaying == false { player?.seek(to: segments[first].start) } // not away from what's playing
-        withAnimation(reduceMotion ? nil : .smooth) { scroller.scrollTo(first, anchor: .center) }
+        guard !search.isEmpty, let transcript = model.store.phrases(of: recording),
+              let first = transcript.segments.firstIndex(where: { $0.text.localizedStandardContains(search) }),
+              let paragraph = transcript.paragraphs.firstIndex(where: { $0.contains(first) }) else { return }
+        if player?.isPlaying == false { player?.seek(to: transcript.segments[first].start) } // not away from what's playing
+        withAnimation(reduceMotion ? nil : .smooth) { scroller.scrollTo(paragraph, anchor: .center) }
     }
 
     private func saveTitle() {
@@ -362,10 +363,16 @@ private struct LiveCard: View {
         didSet {
             let whole = time.isFinite ? Int(time) : 0 // a seek into an unknown length
             if whole != second { second = whole }
+            follow()
         }
     }
     /// `time` in whole seconds, for the clocks, which then redraw once a second.
     private(set) var second = 0
+    /// When each phrase of the transcript begins, for it to show the one being played.
+    @ObservationIgnored var cues: [Double] = [] { didSet { follow() } }
+    /// The phrase being played: the last one begun. None until the call is played or a phrase clicked,
+    /// and it changes only from one phrase to the next, so the transcript redraws only then.
+    private(set) var cue: Int?
     private(set) var duration: Double = 0
     private(set) var isPlaying = false
     var rate: Float = 1 {
@@ -427,6 +434,11 @@ private struct LiveCard: View {
     }
 
     func skip(_ seconds: Double) { seek(to: min(max(0, time + seconds), duration)) }
+
+    private func follow() {
+        let current = time > 0 ? cues.lastIndex { $0 <= time } : nil
+        if current != cue { cue = current }
+    }
 }
 
 private struct PlayerCard: View {
@@ -805,8 +817,10 @@ private struct TranscriptSection: View {
                 }
                 if let progress = model.transcribing[recording.id] {
                     ProgressView("Transcribing…", value: progress)
-                } else if let segments = model.store.segments(of: recording) {
-                    Phrases(segments: segments, player: player, search: search)
+                } else if let transcript = model.store.phrases(of: recording) {
+                    Phrases(transcript: transcript, participants: recording.participants ?? [], player: player, search: search) {
+                        model.store.rename(voice: $0, to: $1, in: recording)
+                    }
                 } else if let text = model.store.transcript(of: recording) {
                     Paragraphs(text: text, search: search)
                 } else if TranscriptionSettings.service != nil {
@@ -846,31 +860,109 @@ private struct TranscriptSection: View {
     }
 }
 
-/// `transcript.json`: who said what, each phrase a click away, like the flags over the wave.
+/// `transcript.json`: who said what, a paragraph each time the speaker changes, each phrase a click
+/// away like the flags over the wave. A voice is named from the menu on its name.
 private struct Phrases: View {
-    let segments: [Transcript.Segment]
+    let transcript: Transcript
+    /// Who was invited, offered as the voices' names.
+    let participants: [String]
+    let player: Player?
+    let search: String
+    let rename: (_ speaker: String, _ name: String?) -> Void
+    @State private var renaming: String? // the voice being named
+    @State private var name = ""
+
+    var body: some View {
+        let segments = transcript.segments
+        LazyVStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(transcript.paragraphs.enumerated()), id: \.offset) { index, phrases in
+                let first = segments[phrases.lowerBound]
+                if phrases.lowerBound == 0 || segments[phrases.lowerBound - 1].speaker != first.speaker, let speaker = first.speaker {
+                    header(speaker, from: first.start)
+                        .padding(.top, index == 0 ? 0 : 14)
+                }
+                Paragraph(segments: segments[phrases], color: Self.color(of: first.speaker), player: player, search: search)
+                    .id(index) // where the search scrolls to
+            }
+        }
+        .environment(\.openURL, OpenURLAction { url in // a phrase is a link to its time
+            if url.scheme == "seek", let time = Double(url.absoluteString.dropFirst("seek:".count)) { player?.seek(to: time) }
+            return .handled
+        })
+        .onChange(of: player == nil, initial: true) { player?.cues = segments.map(\.start) } // made after the transcript is shown
+        .alert(Text("Rename “\(renaming.flatMap(transcript.name(of:)) ?? "")”"), isPresented: Binding { renaming != nil } set: { if !$0 { renaming = nil } }, presenting: renaming) { speaker in
+            TextField("Name", text: $name)
+            Button("Rename") { rename(speaker, name) }
+                .keyboardShortcut(.defaultAction)
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    /// The voice's dot, its name with the menu to name it, and when it begins to speak.
+    private func header(_ speaker: String, from start: Double) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(Self.color(of: speaker)).frame(width: 8, height: 8)
+            Menu {
+                Picker("Name", selection: Binding { transcript.names?[speaker] } set: { rename(speaker, $0) }) {
+                    Text(Transcript.label(of: speaker) ?? speaker).tag(String?.none)
+                    ForEach(speaker == "you" ? [] : participants, id: \.self) { Text($0).tag(Optional($0)) }
+                }
+                .pickerStyle(.inline)
+                Button("Rename…") { name = transcript.names?[speaker] ?? ""; renaming = speaker }
+            } label: {
+                Text(transcript.name(of: speaker) ?? speaker).font(.headline)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Click to rename")
+            Spacer()
+            Button(start.clock) { player?.seek(to: start) }
+                .buttonStyle(.plain)
+                .font(.callout)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// You in gray; the others in red, as the logo's dot, then a color each.
+    private static func color(of speaker: String?) -> Color {
+        let colors: [Color] = [.red, .blue, .green, .orange, .purple, .teal, .pink, .brown]
+        return switch speaker {
+        case "you", nil: .gray
+        case "them": .red
+        case let number?: colors[max(0, (Int(number) ?? 1) - 1) % colors.count]
+        }
+    }
+}
+
+/// A paragraph's phrases as one text to read and select, each a link to its time: those played
+/// dimmed, the one playing marked in its voice's color. The only part that follows the playhead.
+private struct Paragraph: View {
+    let segments: ArraySlice<Transcript.Segment>
+    let color: Color
     let player: Player?
     let search: String
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 5) {
-            ForEach(segments.indices, id: \.self) { i in
-                let segment = segments[i]
-                if i == 0 || segments[i - 1].speaker != segment.speaker, // named where the speaker changes
-                   let name = Transcript.name(of: segment.speaker) {
-                    Text(name)
-                        .font(.headline)
-                        .padding(.top, i == 0 ? 0 : 10)
-                }
-                Button { player?.seek(to: segment.start) } label: {
-                    Text(AttributedString(segment.text, marking: search)).frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .pointerStyle(.link)
-                .help(segment.start.clock)
-                .id(i) // where the search scrolls to
+        let cue = player?.cue
+        var text = AttributedString()
+        for (i, segment) in zip(segments.indices, segments) {
+            if i > segments.startIndex { text += AttributedString(" ") }
+            var phrase = AttributedString(segment.text, marking: search)
+            phrase.link = URL(string: "seek:\(segment.start)")
+            if let cue, i <= cue { // not over what the search marked
+                phrase.mergeAttributes(i == cue ? AttributeContainer().backgroundColor(color.opacity(0.2)) : AttributeContainer().foregroundColor(Color.secondary),
+                                       mergePolicy: .keepCurrent)
             }
+            text += phrase
         }
+        return Text(text)
+            .tint(.primary) // links read as text
+            .lineSpacing(5)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

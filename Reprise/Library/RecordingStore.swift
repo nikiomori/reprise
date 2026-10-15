@@ -122,7 +122,7 @@ enum CalendarEvents {
     private(set) var recordings: [Recording] = []
     /// Read once, not on every keystroke of a search. `nil` inside: there's no transcript.
     @ObservationIgnored private var transcripts: [Recording.ID: String?] = [:]
-    @ObservationIgnored private var segments: [Recording.ID: [Transcript.Segment]?] = [:]
+    @ObservationIgnored private var phrases: [Recording.ID: Transcript?] = [:]
 
     init() { reload() }
 
@@ -205,7 +205,7 @@ enum CalendarEvents {
     /// Until they're asked for again: a search kept every call's transcript in memory.
     func forgetTranscripts() {
         transcripts.removeAll()
-        segments.removeAll()
+        phrases.removeAll()
     }
 
     func transcript(of recording: Recording) -> String? {
@@ -215,11 +215,25 @@ enum CalendarEvents {
         return text
     }
 
-    func segments(of recording: Recording) -> [Transcript.Segment]? {
-        if let cached = segments[recording.id] { return cached }
-        let read = try? JSONDecoder().decode(Transcript.self, from: Data(contentsOf: recording.segmentsURL)).segments
-        segments[recording.id] = read
+    /// `transcript.json`: the phrases with their times and who said them.
+    func phrases(of recording: Recording) -> Transcript? {
+        if let cached = phrases[recording.id] { return cached }
+        let read = try? JSONDecoder().decode(Transcript.self, from: Data(contentsOf: recording.segmentsURL))
+        phrases[recording.id] = read
         return read
+    }
+
+    /// Names a voice of the transcript, or gives it back its label with `nil` or a blank name: in
+    /// `transcript.json`, and in the text that search, Copy, Spotlight and the shortcut read.
+    func rename(voice speaker: String, to name: String?, in recording: Recording) {
+        guard var transcript = phrases(of: recording) else { return }
+        var names = transcript.names ?? [:]
+        let name = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        names[speaker] = name?.isEmpty == false ? name : nil
+        transcript.names = names.isEmpty ? nil : names
+        guard (try? JSONEncoder().encode(transcript).write(to: recording.segmentsURL, options: .atomic)) != nil else { return }
+        try? transcript.text.write(to: recording.transcriptURL, atomically: true, encoding: .utf8)
+        save(recordings.first { $0.id == recording.id } ?? recording) // read again, shown, and indexed again
     }
 
     /// The call as Markdown, for Copy with Details: what and when it was, the moments marked, who
@@ -238,9 +252,9 @@ enum CalendarEvents {
             lines.append(String(localized: "Marked moments: \(marks.map(\.clock).joined(separator: ", "))"))
         }
         lines += ["", "## \(String(localized: "Transcript"))", ""]
-        if let segments = segments(of: recording) {
-            lines += Transcript(segments: segments).turns.map { turn in
-                "[\(turn.start.clock)] " + (Transcript.name(of: turn.speaker).map { "\($0): " } ?? "") + turn.text + "\n"
+        if let transcript = phrases(of: recording) {
+            lines += transcript.turns.map { turn in
+                "[\(turn.start.clock)] " + (transcript.name(of: turn.speaker).map { "\($0): " } ?? "") + turn.text + "\n"
             }
         } else {
             lines.append(transcript(of: recording) ?? String(localized: "Not transcribed. The call's audio is in its folder."))
@@ -250,7 +264,7 @@ enum CalendarEvents {
 
     func save(_ recording: Recording) {
         transcripts.removeValue(forKey: recording.id) // saved after a transcript is written
-        segments.removeValue(forKey: recording.id)
+        phrases.removeValue(forKey: recording.id)
         guard (try? Self.write(recording, into: recording.folder)) != nil else { return }
         if let index = recordings.firstIndex(where: { $0.id == recording.id }) {
             recordings[index] = recording
@@ -301,16 +315,16 @@ enum CalendarEvents {
             cut.movieStart = recording.movieStart.map { max(0, $0 - range.lowerBound) }
             // The phrases within it, timed from its start. A transcript without times can't be cut:
             // it stays with the call as it was, and the cut one can be transcribed again.
-            if let segments = segments(of: recording) {
+            if var kept = phrases(of: recording) {
                 let time = { (seconds: TimeInterval) in (seconds * 1000).rounded() / 1000 } // to the millisecond, as the transcriber writes them
-                let kept = segments.compactMap { segment -> Transcript.Segment? in
+                kept.segments = kept.segments.compactMap { segment -> Transcript.Segment? in
                     guard segment.end > range.lowerBound, segment.start < range.upperBound else { return nil }
                     var segment = segment
                     (segment.start, segment.end) = (time(max(0, segment.start - range.lowerBound)), time(min(segment.end, range.upperBound) - range.lowerBound))
                     return segment
                 }
-                try JSONEncoder().encode(Transcript(segments: kept)).write(to: trimmed.appending(path: "transcript.json"))
-                try Transcript(segments: kept).text.write(to: trimmed.appending(path: "transcript.txt"), atomically: true, encoding: .utf8)
+                try JSONEncoder().encode(kept).write(to: trimmed.appending(path: "transcript.json"))
+                try kept.text.write(to: trimmed.appending(path: "transcript.txt"), atomically: true, encoding: .utf8)
             }
             try Self.write(cut, into: trimmed)
         } catch {
