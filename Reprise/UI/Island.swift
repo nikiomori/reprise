@@ -403,9 +403,10 @@ struct VoiceDots: NSViewRepresentable {
     final class DotsView: NSView {
         var levels: () -> (you: Float, them: Float)
         private let dots = [CALayer(), CALayer()]
-        private var shown = [0.0, 0.0]
+        /// You, then the others. SIMD2 rather than arrays: four allocations a tick, ten ticks a second.
+        private var shown = SIMD2<Double>(0, 0)
         /// `shown` in steps of 1/50, finer than the eye can tell: only a step redraws the island.
-        private var drawn = [-1.0, -1.0]
+        private var drawn = SIMD2<Double>(-1, -1)
         private var timer: Timer?
 
         init(levels: @escaping () -> (you: Float, them: Float)) {
@@ -456,15 +457,16 @@ struct VoiceDots: NSViewRepresentable {
 
         private func show() {
             let peaks = levels()
-            shown = [Self.follow(shown[0], peaks.you), Self.follow(shown[1], peaks.them)]
-            let steps = shown.map { ($0 * 50).rounded() / 50 }
+            shown = SIMD2(Self.follow(shown[0], peaks.you), Self.follow(shown[1], peaks.them))
+            let steps = (shown * 50).rounded(.toNearestOrAwayFromZero) / 50
             // A level holding still, silence above all, leaves the glass alone: each change has the
             // window server composite the island anew.
             guard steps != drawn else { return }
             drawn = steps
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            for (dot, level) in zip(dots, steps) {
+            for (i, dot) in dots.enumerated() {
+                let level = steps[i]
                 dot.opacity = Float(0.4 + 0.6 * level)
                 dot.shadowOpacity = Float(level)
                 dot.shadowRadius = 4 * level
