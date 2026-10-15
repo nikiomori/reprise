@@ -8,7 +8,7 @@
 An open-source call recorder for macOS. It records calls, and nothing else.</p>
 
 <p align="center">
-  <a href="https://github.com/nikiomori/reprise/releases/latest"><b>Download</b></a> · macOS 26 or later · free, MIT
+  <a href="https://github.com/nikiomori/reprise/releases/latest"><b>Download</b></a> · macOS 26 or later on Apple silicon · free, MIT
 </p>
 
 <p align="center">
