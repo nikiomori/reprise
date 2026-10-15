@@ -649,17 +649,19 @@ nonisolated final class WAVWriter: SoundWriter {
         guard !unwritten.isEmpty, let start = try? handle.offset() else { return }
         do {
             try handle.write(contentsOf: unwritten)
-            unwritten.removeAll(keepingCapacity: unwritten.count < 1 << 17)
-            written = encoded
-            isWaitingForDisk = false
-            try handle.seek(toOffset: 0)
-            try handle.write(contentsOf: Self.header(rate: Int(format.sampleRate), frames: written))
-            try handle.seekToEnd()
         } catch {
             try? handle.truncate(atOffset: start)
-            _ = try? handle.seekToEnd()
             isWaitingForDisk = true
+            return
         }
+        unwritten.removeAll(keepingCapacity: unwritten.count < 1 << 17)
+        written = encoded
+        isWaitingForDisk = false
+        // The sound is in, whatever the header does: one that can't be rewritten now (a full disk
+        // with a snapshot, where even an overwrite takes a new block) is rewritten with the next write.
+        try? handle.seek(toOffset: 0)
+        try? handle.write(contentsOf: Self.header(rate: Int(format.sampleRate), frames: written))
+        _ = try? handle.seekToEnd()
     }
 
     func close() {
