@@ -491,7 +491,7 @@ struct TranscriptionServiceTests {
         try JSONEncoder().encode(Transcript(segments: segments, names: ["1": "Anna"])).write(to: recording.segmentsURL)
         store.save(recording)
 
-        let trashed = try await store.trim(recording, to: 0.5...1.5)
+        let trashed = try #require(try await store.trim(recording, to: 0.5...1.5))
         defer { try? FileManager.default.removeItem(at: trashed) }
         let cut = try #require(store.recordings.first { $0.id == recording.id })
         #expect(cut.duration == 1 && cut.marks == [0.7])

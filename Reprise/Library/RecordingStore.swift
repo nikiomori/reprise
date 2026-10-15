@@ -304,8 +304,8 @@ enum CalendarEvents {
     }
 
     /// Cuts the call down to `range`: each of its files, its marks and its transcript. The call as
-    /// it was goes to the Trash; returns where, for Undo.
-    func trim(_ recording: Recording, to range: ClosedRange<TimeInterval>) async throws -> URL {
+    /// it was goes to the Trash; returns where, for Undo, if the Trash said.
+    func trim(_ recording: Recording, to range: ClosedRange<TimeInterval>) async throws -> URL? {
         let files = FileManager.default
         let trimmed = Self.root.appending(path: ".\(recording.id) trimmed", directoryHint: .isDirectory) // hidden from the library
         try? files.removeItem(at: trimmed)
@@ -339,14 +339,17 @@ enum CalendarEvents {
             throw error
         }
         var trashed: NSURL?
-        do { try files.trashItem(at: recording.folder, resultingItemURL: &trashed) } catch { // a server's folder has no Trash
+        do {
+            try files.trashItem(at: recording.folder, resultingItemURL: &trashed) // a server's folder has no Trash
+            try files.moveItem(at: trimmed, to: recording.folder)
+        } catch {
+            if let trashed { try? files.moveItem(at: trashed as URL, to: recording.folder) } // the call as it was, back in the library
             try? files.removeItem(at: trimmed)
             throw error
         }
-        try files.moveItem(at: trimmed, to: recording.folder)
         try? files.removeItem(at: recording.copiesFolder) // clones of the files as they were
         save(cut)
-        return trashed! as URL
+        return trashed as URL?
     }
 
     nonisolated static func cut(_ source: URL, to range: ClosedRange<TimeInterval>, into destination: URL) async throws {

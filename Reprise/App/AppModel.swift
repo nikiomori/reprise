@@ -512,6 +512,7 @@ enum IslandState: Equatable {
         do {
             let trashed = try await store.trim(recording, to: range)
             log.notice("Trimmed \(recording.id, privacy: .public) to \(range.lowerBound)...\(range.upperBound)")
+            guard let trashed else { return }
             undo?.registerUndo(withTarget: self) { model in
                 let files = FileManager.default
                 guard (try? files.removeItem(at: recording.folder)) != nil, (try? files.moveItem(at: trashed, to: recording.folder)) != nil else { return }
