@@ -104,7 +104,7 @@ Optional. Reprise sends the audio, in 10-minute parts (whole to Refrain), to any
 | OpenAI | `gpt-4o-transcribe` | $0.36 |
 | A local server: [speaches](https://github.com/speaches-ai/speaches), WhisperKit, LocalAI, whisper.cpp | Your choice | Free |
 
-A cloud service receives the audio of your call. To keep it on your Mac, use Refrain or another local server. When Refrain is running, **Settings > Transcription** offers it.
+A cloud service receives the audio of your call. To keep it on your Mac, use Refrain or another local server: install it with `brew install nikiomori/tap/refrain` or from [its releases](https://github.com/nikiomori/Refrain/releases/latest). When Refrain is running, **Settings > Transcription** offers it.
 
 If you save each side, Reprise transcribes each one on its own, so the transcript says who spoke, and a click on a phrase plays the call from there. That needs a service that returns timestamps (`verbose_json`), such as Refrain, Groq or a local Whisper server; with any other, Reprise transcribes the call as one. Each side is as long as the call, so a cloud service bills the call twice. Without headphones your microphone hears the others; Reprise takes them out of your side before transcribing it, so their words don't show up as yours.
 
