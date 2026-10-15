@@ -337,6 +337,14 @@ struct UpdaterTests {
     func comparesVersionsNumerically(tag: String, current: String, newer: Bool) {
         #expect(release(tag).isNewer(than: current) == newer)
     }
+
+    /// This very app has its own signature, so it passes as an update only to an older version.
+    @MainActor @Test func installsOnlyANewerVersion() throws {
+        let app = Bundle.main.bundleURL
+        try Updater.verify(app, newerThan: "0.0.1")
+        #expect(throws: Failure.self) { try Updater.verify(app, newerThan: Updater.current) }
+        #expect(throws: Failure.self) { try Updater.verify(app, newerThan: "99.0") }
+    }
 }
 
 struct TranscriptionServiceTests {

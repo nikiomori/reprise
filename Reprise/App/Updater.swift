@@ -60,7 +60,8 @@ import Security
                 let folder = try await Self.download(zip.browser_download_url)
                 defer { try? FileManager.default.removeItem(at: folder) }
                 let app = folder.appending(path: "Reprise.app")
-                try await Task.detached { try Self.verify(app) }.value
+                let installed = Self.current
+                try await Task.detached { try Self.verify(app, newerThan: installed) }.value
                 // Relaunching would cut a call that started during the download short.
                 guard AppModel.shared.session == nil else { throw Failure("Finish the recording, then install the update.") }
                 _ = try FileManager.default.replaceItemAt(Bundle.main.bundleURL, withItemAt: app)
@@ -101,15 +102,19 @@ import Security
         return folder
     }
 
-    /// Only an app with this copy's signature — same developer, same bundle ID — may replace it.
-    /// A build from the source code has its own signature, so it never takes a release.
-    private nonisolated static func verify(_ app: URL) throws {
+    /// Only an app with this copy's signature — same developer, same bundle ID — and a newer version
+    /// may replace it. A build from the source code has its own signature, so it never takes a release.
+    nonisolated static func verify(_ app: URL, newerThan installed: String) throws {
         var current: SecStaticCode?, update: SecStaticCode?, requirement: SecRequirement?
         guard SecStaticCodeCreateWithPath(Bundle.main.bundleURL as CFURL, [], &current) == errSecSuccess, let current,
               SecCodeCopyDesignatedRequirement(current, [], &requirement) == errSecSuccess,
               SecStaticCodeCreateWithPath(app as CFURL, [], &update) == errSecSuccess, let update,
               SecStaticCodeCheckValidity(update, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode), requirement) == errSecSuccess
         else { throw Failure("The download doesn't have the signature of this copy of Reprise. Download the update from GitHub.") }
+        // An older release under a new tag would put back what was fixed since: signed, but not an update.
+        guard let version = Bundle(url: app)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              version.compare(installed, options: .numeric) == .orderedDescending
+        else { throw Failure("The download is no newer than this copy of Reprise.") }
     }
 }
 

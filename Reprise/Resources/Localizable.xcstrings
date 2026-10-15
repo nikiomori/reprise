@@ -2114,6 +2114,16 @@
         }
       }
     },
+    "The download is no newer than this copy of Reprise." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачанная версия не новее этой копии Reprise."
+          }
+        }
+      }
+    },
     "The file has no sound to play." : {
       "localizations" : {
         "ru" : {
