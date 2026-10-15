@@ -822,6 +822,10 @@ private struct TranscriptSection: View {
                 }
                 if let progress = model.transcribing[recording.id] {
                     ProgressView("Transcribing…", value: progress)
+                } else if model.store.transcript(of: recording)?.allSatisfy(\.isWhitespace) == true {
+                    // The service heard no words (ringing, a hold, a muted call): said, rather than an empty box.
+                    Text("No speech in this call.")
+                        .foregroundStyle(.secondary)
                 } else if let transcript = model.store.phrases(of: recording) {
                     Phrases(transcript: transcript, participants: recording.participants ?? [], player: player, search: search) {
                         model.store.rename(voice: $0, to: $1, in: recording)

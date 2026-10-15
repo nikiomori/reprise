@@ -1118,6 +1118,16 @@
         }
       }
     },
+    "No speech in this call." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В этом звонке нет речи."
+          }
+        }
+      }
+    },
     "None" : {
       "localizations" : {
         "ru" : {
