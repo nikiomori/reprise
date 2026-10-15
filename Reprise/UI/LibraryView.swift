@@ -22,17 +22,21 @@ struct LibraryView: View {
                         ForEach(section.recordings) { recording in
                             RecordingRow(recording: recording, isLive: model.isLive(recording), isSaving: model.saving.contains(recording.id))
                                 .tag(recording.id)
-                                .contextMenu {
-                                    ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
-                                        .disabled(model.isLive(recording)) // its file is still being written
-                                    Button("Show in Finder") { model.store.revealInFinder(recording) }
-                                    Button(recording.favorite == true ? "Remove from Favorites" : "Add to Favorites") { model.toggleFavorite(recording) }
-                                    Divider()
-                                    Button("Move to Trash", role: .destructive) { model.delete(recording, shown: shown, undo: undoManager) }
-                                        .disabled(model.isLive(recording))
-                                }
                         }
                     }
+                }
+            }
+            // One menu for the list, made on a right click: a menu on each row is a view graph kept for
+            // every call, the window closed or not.
+            .contextMenu(forSelectionType: Recording.ID.self) { ids in
+                if let recording = shown.first(where: { ids.contains($0.id) }) {
+                    ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
+                        .disabled(model.isLive(recording)) // its file is still being written
+                    Button("Show in Finder") { model.store.revealInFinder(recording) }
+                    Button(recording.favorite == true ? "Remove from Favorites" : "Add to Favorites") { model.toggleFavorite(recording) }
+                    Divider()
+                    Button("Move to Trash", role: .destructive) { model.delete(recording, shown: shown, undo: undoManager) }
+                        .disabled(model.isLive(recording))
                 }
             }
             .focused($listFocused)
