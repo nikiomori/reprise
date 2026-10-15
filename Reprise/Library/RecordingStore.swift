@@ -163,11 +163,16 @@ enum CalendarEvents {
         let new = recordings.filter { !indexed.contains($0.id) }
         let gone = indexed.subtracting(recordings.map(\.id))
         guard !new.isEmpty || !gone.isEmpty else { return }
-        UserDefaults.standard.set(recordings.map(\.id), forKey: Self.indexedKey)
-        let entities = new.map(entity)
+        let ids = recordings.map(\.id), entities = new.map(entity)
         Task {
-            try? await CSSearchableIndex.default().deleteAppEntities(identifiedBy: Array(gone), ofType: CallEntity.self)
-            try? await CSSearchableIndex.default().indexAppEntities(entities)
+            // Noted once Spotlight has them: noted before, calls it failed to take were never offered again.
+            do {
+                if !gone.isEmpty { try await CSSearchableIndex.default().deleteAppEntities(identifiedBy: Array(gone), ofType: CallEntity.self) }
+                if !entities.isEmpty { try await CSSearchableIndex.default().indexAppEntities(entities) }
+                UserDefaults.standard.set(ids, forKey: Self.indexedKey)
+            } catch {
+                log.error("Spotlight didn't take the calls: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
@@ -175,9 +180,11 @@ enum CalendarEvents {
     private func index(_ recording: Recording) {
         guard Self.indexesSpotlight else { return }
         let entity = entity(of: recording)
-        Task { try? await CSSearchableIndex.default().indexAppEntities([entity]) }
-        var indexed = UserDefaults.standard.stringArray(forKey: Self.indexedKey) ?? []
-        if !indexed.contains(recording.id) { indexed.append(recording.id); UserDefaults.standard.set(indexed, forKey: Self.indexedKey) }
+        Task {
+            guard (try? await CSSearchableIndex.default().indexAppEntities([entity])) != nil else { return }
+            var indexed = UserDefaults.standard.stringArray(forKey: Self.indexedKey) ?? []
+            if !indexed.contains(entity.id) { indexed.append(entity.id); UserDefaults.standard.set(indexed, forKey: Self.indexedKey) }
+        }
     }
 
     /// Creates the folder for a recording that is about to start.
