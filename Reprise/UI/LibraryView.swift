@@ -8,6 +8,7 @@ struct LibraryView: View {
     @FocusState private var listFocused: Bool
     @FocusState private var searchFocused: Bool
     @State private var dropping = false
+    @State private var favoritesOnly = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.undoManager) private var undoManager
 
@@ -25,6 +26,7 @@ struct LibraryView: View {
                                     ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
                                         .disabled(model.isLive(recording)) // its file is still being written
                                     Button("Show in Finder") { model.store.revealInFinder(recording) }
+                                    Button(recording.favorite == true ? "Remove from Favorites" : "Add to Favorites") { model.toggleFavorite(recording) }
                                     Divider()
                                     Button("Move to Trash", role: .destructive) { model.delete(recording, shown: shown, undo: undoManager) }
                                         .disabled(model.isLive(recording))
@@ -41,8 +43,17 @@ struct LibraryView: View {
             .onDeleteCommand { if let selected { model.delete(selected, shown: shown, undo: undoManager) } }
             .overlay {
                 if !model.store.recordings.isEmpty, sections.isEmpty {
-                    ContentUnavailableView.search(text: search)
+                    if search.isEmpty { // only Favorites shown, and there are none
+                        ContentUnavailableView("No Favorites", systemImage: "star", description: Text("Calls you add to Favorites appear here."))
+                    } else {
+                        ContentUnavailableView.search(text: search)
+                    }
                 }
+            }
+            .toolbar {
+                // As Mail filters a mailbox, and together with the search.
+                Toggle("Show Only Favorites", systemImage: "line.3.horizontal.decrease", isOn: $favoritesOnly)
+                    .help("Show only favorites")
             }
             // A recording made elsewhere, dropped from Finder, becomes a call of its own.
             .dropDestination(for: URL.self) { files, _ in model.add(files) }
@@ -103,8 +114,9 @@ struct LibraryView: View {
     private var sections: [(title: String, recordings: [Recording])] {
         let calendar = Calendar.current
         let matches = model.store.recordings.filter {
-            search.isEmpty || $0.title.localizedStandardContains(search) || ($0.participants ?? []).contains { $0.localizedStandardContains(search) }
-                || (model.store.transcript(of: $0)?.localizedStandardContains(search) ?? false)
+            (!favoritesOnly || $0.favorite == true) && (search.isEmpty || $0.title.localizedStandardContains(search)
+                || ($0.participants ?? []).contains { $0.localizedStandardContains(search) }
+                || (model.store.transcript(of: $0)?.localizedStandardContains(search) ?? false))
         }
         let grouped = Dictionary(grouping: matches) { calendar.startOfDay(for: $0.startedAt) }
         return grouped.keys.sorted(by: >).map { day in
@@ -148,6 +160,10 @@ private struct RecordingRow: View {
                 Image(systemName: "display").font(.caption).foregroundStyle(.tertiary)
                     .help("Includes a screen recording")
                     .accessibilityLabel("Includes a screen recording") // not "display"
+            }
+            if recording.favorite == true {
+                Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                    .accessibilityLabel("Favorite")
             }
         }
         .padding(.vertical, 3)
@@ -240,6 +256,9 @@ private struct RecordingDetail: View {
         .toolbar {
             ToolbarSpacer(.fixed) // this call's actions apart from Record, which isn't about it
             ToolbarItemGroup {
+                let favorite = recording.favorite == true
+                Button(favorite ? "Remove from Favorites" : "Add to Favorites", systemImage: favorite ? "star.fill" : "star") { model.toggleFavorite(recording) }
+                    .keyboardShortcut("d") // as a page is added to favorites in a browser
                 ShareLink(item: CallFile(recording), preview: SharePreview(recording.title))
                     .disabled(model.isLive(recording))
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }

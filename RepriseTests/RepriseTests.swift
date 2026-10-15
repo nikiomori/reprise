@@ -393,14 +393,16 @@ struct TranscriptionServiceTests {
         #expect(FileManager.default.fileExists(atPath: recording.videoURL.path)) // still in the folder
     }
 
-    /// Renamed while the stopped recording was still being saved: the save keeps the new title.
+    /// Renamed and starred while the stopped recording was still being saved: the save keeps both.
     @Test func renameWhileSavingStays() async throws {
         let recording = try store.create(app: nil, at: .now)
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         var renamed = recording
         renamed.title = "Interview"
+        renamed.favorite = true
         store.save(renamed)
-        #expect(await store.finalize(recording).title == "Interview")
+        let saved = await store.finalize(recording)
+        #expect(saved.title == "Interview" && saved.favorite == true)
     }
 
     /// A folder duplicated or renamed in Finder is a recording of its own, so it plays and trashes itself.

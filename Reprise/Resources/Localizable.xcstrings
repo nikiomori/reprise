@@ -93,6 +93,16 @@
         }
       }
     },
+    "Add to Favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить в избранное"
+          }
+        }
+      }
+    },
     "After Each Call" : {
       "localizations" : {
         "ru" : {
@@ -319,6 +329,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Идёт звонок в %@"
+          }
+        }
+      }
+    },
+    "Calls you add to Favorites appear here." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Здесь появятся звонки, которые вы добавите в избранное."
           }
         }
       }
@@ -585,6 +605,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Все остальные — macOS спросит при первой записи"
+          }
+        }
+      }
+    },
+    "Favorite" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В избранном"
           }
         }
       }
@@ -1014,6 +1044,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Звонков пока нет"
+          }
+        }
+      }
+    },
+    "No Favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет избранного"
           }
         }
       }
@@ -1498,6 +1538,16 @@
         }
       }
     },
+    "Remove from Favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убрать из избранного"
+          }
+        }
+      }
+    },
     "Reprise" : {
       "shouldTranslate" : false
     },
@@ -1744,12 +1794,32 @@
         }
       }
     },
+    "Show Only Favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только избранное"
+          }
+        }
+      }
+    },
     "Show in Finder" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Показать в Finder"
+          }
+        }
+      }
+    },
+    "Show only favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать только избранное"
           }
         }
       }

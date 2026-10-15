@@ -21,6 +21,8 @@ struct Recording: Codable, Identifiable, Equatable {
     var marks: [TimeInterval]?
     /// Who else was invited to the calendar event the call belongs to.
     var participants: [String]?
+    /// In Favorites. Not written when it isn't.
+    var favorite: Bool?
 
     var folder: URL { RecordingStore.root.appending(path: id, directoryHint: .isDirectory) }
     var finalAudioURL: URL { folder.appending(path: "audio.m4a") }
@@ -381,7 +383,9 @@ enum CalendarEvents {
         if recording.duration == 0, let seconds = try? await AVURLAsset(url: recording.audioURL).load(.duration).seconds {
             recording.duration = seconds // a recording cut short by a crash
         }
-        recording.title = recordings.first { $0.id == recording.id }?.title ?? recording.title // renamed while saving
+        if let saved = recordings.first(where: { $0.id == recording.id }) { // renamed or starred while saving
+            (recording.title, recording.favorite) = (saved.title, saved.favorite)
+        }
         save(recording)
         return recording
     }

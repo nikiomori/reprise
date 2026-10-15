@@ -480,6 +480,14 @@ enum IslandState: Equatable {
         if session?.recording.id == recording.id { session?.recording.title = title }
     }
 
+    /// Adds the call to Favorites, or takes it out. Also while it's recorded or saved, as a rename.
+    func toggleFavorite(_ recording: Recording) {
+        guard var recording = store.recordings.first(where: { $0.id == recording.id }) else { return }
+        recording.favorite = recording.favorite == true ? nil : true
+        store.save(recording)
+        if session?.recording.id == recording.id { session?.recording.favorite = recording.favorite }
+    }
+
     /// Being recorded or saved: its files aren't done yet.
     func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id || saving.contains(recording.id) }
 
@@ -546,9 +554,10 @@ enum IslandState: Equatable {
             store.save(recording)
             selection = recording.id
             try await RecordingStore.importSound(of: file, to: recording.finalAudioURL)
-            recording.duration = try await AVURLAsset(url: recording.finalAudioURL).load(.duration).seconds
-            guard recording.duration > 0 else { throw Failure("The file has no sound to play.") }
-            recording.title = store.recordings.first { $0.id == recording.id }?.title ?? recording.title // renamed meanwhile
+            let duration = try await AVURLAsset(url: recording.finalAudioURL).load(.duration).seconds
+            guard duration > 0 else { throw Failure("The file has no sound to play.") }
+            recording = store.recordings.first { $0.id == recording.id } ?? recording // renamed or starred meanwhile
+            recording.duration = duration
             store.save(recording)
             saving.remove(recording.id)
             log.notice("Added \(recording.id, privacy: .public) from a file, \(Int(recording.duration))s")
