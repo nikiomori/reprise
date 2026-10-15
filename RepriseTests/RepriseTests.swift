@@ -27,6 +27,15 @@ import Testing
     func ignoresEverythingElse(bundleID: String) {
         #expect(MeetingApp.matching(processBundleID: bundleID) == nil)
     }
+
+    /// A call in `avconferenced` is FaceTime's when it's in front or open alone, else the Phone's.
+    @Test func conferenceDaemonGoesToTheCallApp() {
+        let (faceTime, phone) = (MeetingApp.faceTime.id, MeetingApp.phone.id)
+        #expect(MeetingApp.conferenceApp(frontmost: nil, running: []) == .phone) // answered from the notification
+        #expect(MeetingApp.conferenceApp(frontmost: nil, running: [faceTime]) == .faceTime)
+        #expect(MeetingApp.conferenceApp(frontmost: nil, running: [faceTime, phone]) == .phone)
+        #expect(MeetingApp.conferenceApp(frontmost: faceTime, running: [faceTime, phone]) == .faceTime)
+    }
 }
 
 struct MixDownTests {

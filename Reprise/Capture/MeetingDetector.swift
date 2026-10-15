@@ -48,8 +48,8 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     private static let callApps: [MeetingApp] = [
         .init(id: "us.zoom.xos", name: "Zoom"),
         .init(id: "com.microsoft.teams2", name: "Microsoft Teams"),
-        .init(id: "com.apple.FaceTime", name: "FaceTime"),
-        .init(id: "com.apple.mobilephone", name: String(localized: "Phone")), // iPhone calls on the Mac, since macOS 26
+        faceTime,
+        phone,
         .init(id: "com.tinyspeck.slackmacgap", name: "Slack"),
         .init(id: "com.hnc.Discord", name: "Discord"),
         .init(id: "Cisco-Systems.Spark", name: "Webex"),
@@ -63,6 +63,18 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         .init(id: "org.jitsi.jitsi-meet", name: "Jitsi Meet"),
         .init(id: "ru.yandex.desktop.telemost", name: "Yandex Telemost"),
     ]
+
+    static let faceTime = MeetingApp(id: "com.apple.FaceTime", name: "FaceTime")
+    static let phone = MeetingApp(id: "com.apple.mobilephone", name: String(localized: "Phone")) // iPhone calls on the Mac, since macOS 26
+
+    /// FaceTime and iPhone calls run their sound in `avconferenced`, a daemon of no app.
+    static let conferenceDaemon = "com.apple.avconferenced"
+
+    /// The app of a call in `avconferenced`: FaceTime when it's in front, or open without Phone;
+    /// Phone otherwise, a call answered from its notification included.
+    static func conferenceApp(frontmost: String?, running: Set<String>) -> MeetingApp {
+        frontmost == faceTime.id || running.contains(faceTime.id) && !running.contains(phone.id) ? faceTime : phone
+    }
 
     /// Google Meet and every other web call.
     private static let browsers: [MeetingApp] = [
@@ -255,7 +267,10 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
 
     /// The app's audio processes, helpers included: what a tap needs to record only that app.
     static func processes(of app: MeetingApp) -> [AudioObjectID] {
-        AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter { Self.app(of: $0) == app }
+        AudioObjectID.system.ids(kAudioHardwarePropertyProcessObjectList).filter {
+            // The daemon counts as either app depending on which is in front: both tap it.
+            Self.app(of: $0) == app || [MeetingApp.faceTime, .phone].contains(app) && $0.string(kAudioProcessPropertyBundleID) == MeetingApp.conferenceDaemon
+        }
     }
 
     /// Some process of the app is playing sound, even if it's silence.
@@ -272,8 +287,12 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
         // leader tells Dia's "company.thebrowser.browser.helper" apart from Arc's.
         let owner = NSRunningApplication(processIdentifier: getpgid(pid))
         guard owner?.bundleIdentifier != Bundle.main.bundleIdentifier else { return nil }
-        if let known = [owner?.bundleIdentifier, process.string(kAudioProcessPropertyBundleID)]
-            .compactMap({ $0.flatMap(MeetingApp.matching) }).first {
+        let bundleID = process.string(kAudioProcessPropertyBundleID)
+        if bundleID == MeetingApp.conferenceDaemon {
+            return MeetingApp.conferenceApp(frontmost: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                            running: Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)))
+        }
+        if let known = [owner?.bundleIdentifier, bundleID].compactMap({ $0.flatMap(MeetingApp.matching) }).first {
             return known
         }
         // Any other regular app with the mic open might be a call too (VK, Lark, a new client…).
