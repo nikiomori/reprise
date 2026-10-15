@@ -166,12 +166,15 @@ nonisolated enum Transcriber {
 
     /// The mix with who said what, from a service that tells voices apart: for a call without its
     /// sides. `nil` when it can't, or the call is too long for a cloud service to label.
+    /// `minSpeakers`: as many voices as there are at least, for a server on this Mac or the local
+    /// network that takes it (Refrain, pyannote's and whisperX's); a cloud service may turn it down.
     static func diarize(
-        _ audio: URL, service: TranscriptionService, apiKey: String?, language: String?,
+        _ audio: URL, service: TranscriptionService, apiKey: String?, language: String?, minSpeakers: Int? = nil,
         progress: @Sendable (Double) async -> Void
     ) async throws -> Transcript? {
         do {
-            let segments = try await pieces(of: audio, as: .diarized, service: service, apiKey: apiKey, language: language, progress: progress)
+            let segments = try await pieces(of: audio, as: .diarized, service: service, apiKey: apiKey, language: language,
+                                            minSpeakers: service.isLocal ? minSpeakers : nil, progress: progress)
             return Transcript(segments: numbered(segments, alone: nil))
         } catch is Unsupported {
             return nil
@@ -245,7 +248,7 @@ nonisolated enum Transcriber {
     /// The phrases of `audio`, timed from the start of the call; as text, a piece is one phrase.
     /// Off the main thread: each piece is read whole into the upload.
     @concurrent private static func pieces(
-        of audio: URL, as format: Format, service: TranscriptionService, apiKey: String?, language: String?,
+        of audio: URL, as format: Format, service: TranscriptionService, apiKey: String?, language: String?, minSpeakers: Int? = nil,
         progress: @Sendable (Double) async -> Void
     ) async throws -> [Transcript.Segment] {
         let asset = AVURLAsset(url: audio)
@@ -276,7 +279,7 @@ nonisolated enum Transcriber {
             // The tail of the previous piece keeps names and spelling consistent across chunks.
             let text = phrases.map(\.text).joined(separator: " ")
             let said = try await upload(piece, as: format, seconds: min(length, duration - start), service: service,
-                                        apiKey: apiKey, language: language, prompt: String(text.suffix(400)))
+                                        apiKey: apiKey, language: language, prompt: String(text.suffix(400)), minSpeakers: minSpeakers)
             // To the millisecond: 600 + 12.34 would be 612.3399999999999 in the file.
             let time = { (($0 + start) * 1000).rounded() / 1000 }
             phrases += said.map { var segment = $0; segment.start = time($0.start); segment.end = time($0.end); return segment }
@@ -287,7 +290,8 @@ nonisolated enum Transcriber {
     }
 
     private static func upload(
-        _ file: URL, as format: Format, seconds: Double, service: TranscriptionService, apiKey: String?, language: String?, prompt: String
+        _ file: URL, as format: Format, seconds: Double, service: TranscriptionService, apiKey: String?, language: String?, prompt: String,
+        minSpeakers: Int? = nil
     ) async throws -> [Transcript.Segment] {
         guard let url = service.endpoint else {
             throw Failure("The server address isn't a valid URL.")
@@ -305,6 +309,7 @@ nonisolated enum Transcriber {
         field("model", service.model)
         field("response_format", format.rawValue)
         if format == .diarized { field("chunking_strategy", "auto") } // OpenAI wants it past 30 seconds
+        if format == .diarized, let minSpeakers { field("min_speakers", String(minSpeakers)) }
         if let language, !language.isEmpty { field("language", language) }
         if !prompt.isEmpty { field("prompt", prompt) }
         head.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".utf8))

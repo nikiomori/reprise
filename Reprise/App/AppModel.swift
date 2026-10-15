@@ -597,7 +597,10 @@ enum IslandState: Equatable {
                 let transcript = if let sides = recording.sides {
                     try await Transcriber.transcribe(you: sides[0], them: sides[1], service: service, apiKey: apiKey, language: language, progress: report)
                 } else {
-                    try await Transcriber.diarize(recording.audioURL, service: service, apiKey: apiKey, language: language, progress: report)
+                    // A call has you and at least one other. Untold, a diarizer took two people for one
+                    // when one of them spoke little. Not a recording without a call, which may be one voice.
+                    try await Transcriber.diarize(recording.audioURL, service: service, apiKey: apiKey, language: language,
+                                                  minSpeakers: recording.app != nil ? 2 : nil, progress: report)
                 }
                 if let transcript {
                     try JSONEncoder().encode(transcript).write(to: recording.segmentsURL, options: .atomic)
