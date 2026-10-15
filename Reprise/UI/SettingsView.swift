@@ -331,7 +331,10 @@ private struct TranscriptionSettingsView: View {
     @AppStorage(TranscriptionSettings.languageKey) private var language = ""
     @AppStorage(TranscriptionSettings.autoKey) private var auto = false
     @State private var apiKey = TranscriptionSettings.apiKey ?? ""
-    @State private var refrainRunning = false
+    @State private var refrainRunning: Bool? // nil until asked, so no row flashes in the meantime
+
+    /// Refrain comes from its own releases, not with Reprise.
+    private static let refrainRelease = URL(string: "https://github.com/nikiomori/Refrain/releases/latest")!
 
     /// Two-letter codes, which is what Whisper-style services take, named in the user's language.
     private static let languages = Locale.LanguageCode.isoLanguageCodes
@@ -351,7 +354,24 @@ private struct TranscriptionSettingsView: View {
                     Divider()
                     Label("Custom", systemImage: "network").tag("Custom")
                 }
-                if refrainRunning, baseURL != TranscriptionService.refrain.baseURL {
+                if refrainRunning == false, baseURL == TranscriptionService.refrain.baseURL {
+                    if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "dev.nikiomori.refrain") {
+                        LabeledContent {
+                            Button("Open Refrain") { NSWorkspace.shared.openApplication(at: app, configuration: .init()) }
+                        } label: {
+                            Text("Refrain isn't running")
+                            Text("Open it to transcribe calls.")
+                        }
+                    } else {
+                        LabeledContent {
+                            Button("Download") { NSWorkspace.shared.open(Self.refrainRelease) }
+                        } label: {
+                            Text("Refrain isn't on this Mac")
+                            Text("It's free. Download it and move it to Applications.")
+                        }
+                    }
+                }
+                if refrainRunning == true, baseURL != TranscriptionService.refrain.baseURL {
                     HStack {
                         Text("Refrain is running on this Mac")
                         Spacer()
@@ -390,7 +410,14 @@ private struct TranscriptionSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .task { refrainRunning = await TranscriptionService.refrainIsRunning() }
+        .task(id: baseURL) {
+            refrainRunning = await TranscriptionService.refrainIsRunning()
+            // Opened from the row above, or after a download, it answers in a moment and the row goes.
+            while refrainRunning == false, baseURL == TranscriptionService.refrain.baseURL,
+                  (try? await Task.sleep(for: .seconds(2))) != nil {
+                refrainRunning = await TranscriptionService.refrainIsRunning()
+            }
+        }
     }
 
     /// This Mac, a server nearby, or the service's own logo, named after it in the asset catalog.

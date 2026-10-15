@@ -569,6 +569,16 @@
         }
       }
     },
+    "Download" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать"
+          }
+        }
+      }
+    },
     "Duration" : {
       "localizations" : {
         "ru" : {
@@ -831,6 +841,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Установится с перезапуском"
+          }
+        }
+      }
+    },
+    "It's free. Download it and move it to Applications." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Он бесплатный. Скачайте его и перенесите в «Программы»."
           }
         }
       }
@@ -1198,6 +1218,16 @@
         }
       }
     },
+    "Open Refrain" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть Refrain"
+          }
+        }
+      }
+    },
     "Open Reprise at login" : {
       "localizations" : {
         "ru" : {
@@ -1214,6 +1244,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Открыть Настройки"
+          }
+        }
+      }
+    },
+    "Open it to transcribe calls." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте его, чтобы расшифровывать звонки."
           }
         }
       }
@@ -1524,6 +1564,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Refrain запущен на этом Mac"
+          }
+        }
+      }
+    },
+    "Refrain isn't on this Mac" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refrain нет на этом Mac"
+          }
+        }
+      }
+    },
+    "Refrain isn't running" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refrain не запущен"
           }
         }
       }
