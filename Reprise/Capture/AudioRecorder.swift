@@ -361,10 +361,16 @@ nonisolated final class Encoding: @unchecked Sendable {
             // One per file, as each keeps its state from piece to piece.
             converters = files.map { _ in resampling ? AVAudioConverter(from: format, to: fileFormat) : nil }
             resampled = files.map { _ in resampling ? AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: AVAudioFrameCount(4096 * fileFormat.sampleRate / format.sampleRate) + 64) : nil }
-            // Room for what comes between two drains and a little late, so the IO thread doesn't allocate.
-            let room = Int(format.sampleRate / 3)
+            // Room for two seconds, so the IO thread doesn't allocate: drains come every quarter of one,
+            // but at background priority a busy Mac holds them back. A third of a second grew on the
+            // IO thread as soon as one ran late. Pages that are never written take no memory.
+            let room = Int(format.sampleRate * 2)
             for i in taken.sound.indices { taken.sound[i].reserveCapacity(room) }
-            handed.withLock { for i in $0.sound.indices { $0.sound[i].reserveCapacity(room) } }
+            taken.silences.reserveCapacity(16)
+            handed.withLock {
+                for i in $0.sound.indices { $0.sound[i].reserveCapacity(room) }
+                $0.silences.reserveCapacity(16)
+            }
         }
         (sinceAsked, quarter) = (0, Int(format.sampleRate / 4))
     }
