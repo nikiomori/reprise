@@ -769,9 +769,14 @@ struct EchoCancellerTests {
     func takesTheirEchoOutOfYourSide(format: String) throws {
         let (you, them, near) = try call(echo: true, as: format)
         defer { try? FileManager.default.removeItem(at: you.deletingLastPathComponent()) }
-        let before = try read(you)
+        let before = try read(you), recorded = try Data(contentsOf: you)
         #expect(try EchoCanceller.lag(of: you, behind: them) == rate / 40)
-        #expect(try EchoCanceller.clean(you, against: them))
+        // Your side as recorded is in the Trash, named after its call.
+        let trashed = try #require(try EchoCanceller.clean(you, against: them))
+        defer { try? FileManager.default.removeItem(at: trashed) }
+        #expect(try Data(contentsOf: trashed) == recorded)
+        #expect(trashed.lastPathComponent.hasPrefix(you.deletingLastPathComponent().lastPathComponent))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: you.deletingLastPathComponent().path).sorted() == ["them.\(format)", "you.\(format)"])
         let after = try read(you)
         #expect(after.count == before.count) // on the same timeline as the others and the transcript
         // Once it has learned the echo path: their voice alone, at least 20 dB quieter (28 measured).
@@ -785,7 +790,7 @@ struct EchoCancellerTests {
         let (you, them, _) = try call(echo: false)
         defer { try? FileManager.default.removeItem(at: you.deletingLastPathComponent()) }
         let before = try Data(contentsOf: you)
-        #expect(try !EchoCanceller.clean(you, against: them))
+        #expect(try EchoCanceller.clean(you, against: them) == nil)
         #expect(try Data(contentsOf: you) == before)
     }
 }

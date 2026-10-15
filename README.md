@@ -148,7 +148,7 @@ CODE_SIGN_IDENTITY = Apple Development
 - **Detection.** Core Audio tells Reprise when an app starts or stops audio, and Reprise looks at which apps hold the microphone.
 - **Audio.** A private aggregate device joins the microphone and a Core Audio process tap on one clock, so the two sides never drift apart. The tap can take only the call app's sound.
 - **Headphones.** Reprise never opens a Bluetooth headset's microphone itself, so it never pushes headphones into call mode.
-- **Echo.** After a call with each side saved, the others' side, which is what the speakers played, is subtracted from yours by an adaptive filter, as a phone's echo canceller does, but with the whole call in hand. With headphones there's no echo to find, and your side stays as recorded.
+- **Echo.** After a call with each side saved, the others' side, which is what the speakers played, is subtracted from yours by an adaptive filter, as a phone's echo canceller does, but with the whole call in hand. With headphones there's no echo to find, and your side stays as recorded. Otherwise your side as recorded goes to the Trash, named after its call, so it can come back if the filter took too much.
 
 The full design, research and roadmap are in [docs/PLAN.md](docs/PLAN.md).
 

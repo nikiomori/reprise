@@ -27,6 +27,16 @@
     "%@ · %@" : {
       "shouldTranslate" : false
     },
+    "%@ — your side before echo removal" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — ваша сторона до очистки от эха"
+          }
+        }
+      }
+    },
     "%@: Record this call?" : {
       "localizations" : {
         "ru" : {

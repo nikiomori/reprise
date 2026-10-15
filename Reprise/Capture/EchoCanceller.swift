@@ -16,13 +16,13 @@ import Accelerate
 /// 3. What's left of the echo, the part a linear filter can't model (the speakers' distortion),
 ///    is turned down where the echo estimate dominates.
 nonisolated enum EchoCanceller {
-    /// Cleans `you` in place, its sound only, at its own rate and format. False: no echo found,
-    /// and the file wasn't touched.
-    static func clean(_ you: URL, against them: URL) throws -> Bool {
-        guard let lag = try lag(of: you, behind: them) else { return false }
+    /// Cleans `you` in place, its sound only, at its own rate and format. Returns where your side as
+    /// recorded went in the Trash; `nil`: no echo found, and the file wasn't touched.
+    static func clean(_ you: URL, against them: URL) throws -> URL? {
+        guard let lag = try lag(of: you, behind: them) else { return nil }
         let mic = try AVAudioFile(forReading: you), reference = try AVAudioFile(forReading: them)
         let format = mic.processingFormat
-        guard format.channelCount == 1, reference.processingFormat.sampleRate == format.sampleRate else { return false }
+        guard format.channelCount == 1, reference.processingFormat.sampleRate == format.sampleRate else { return nil }
         let cleaned = you.deletingLastPathComponent().appending(path: "you-cleaned.\(you.pathExtension)")
         try? FileManager.default.removeItem(at: cleaned)
         do {
@@ -32,8 +32,31 @@ nonisolated enum EchoCanceller {
             try? FileManager.default.removeItem(at: cleaned)
             throw error
         }
-        _ = try FileManager.default.replaceItemAt(you, withItemAt: cleaned)
-        return true
+        return try keep(you, replacedWith: cleaned)
+    }
+
+    /// Your side as recorded goes to the Trash, named after its call, and `cleaned` takes its place:
+    /// a filter that took your voice for their echo is undone from there. In a folder without a
+    /// Trash (a server), your side stays as recorded.
+    private static func keep(_ you: URL, replacedWith cleaned: URL) throws -> URL {
+        let files = FileManager.default
+        let call = you.deletingLastPathComponent()
+        let recorded = call.appending(path: String(localized: "\(call.lastPathComponent) — your side before echo removal") + ".\(you.pathExtension)")
+        var trashed: NSURL?
+        do {
+            try files.moveItem(at: you, to: recorded)
+            do {
+                try files.trashItem(at: recorded, resultingItemURL: &trashed)
+                try files.moveItem(at: cleaned, to: you)
+            } catch {
+                try? files.moveItem(at: (trashed as URL?) ?? recorded, to: you)
+                throw error
+            }
+        } catch {
+            try? files.removeItem(at: cleaned)
+            throw error
+        }
+        return (trashed as URL?) ?? recorded
     }
 
     /// Each side through the filter, a block at a time, into `out`, with as many samples as the

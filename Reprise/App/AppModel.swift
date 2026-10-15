@@ -385,8 +385,8 @@ enum IslandState: Equatable {
         echoes[id] = Task(priority: .background) {
             let started = ContinuousClock.now
             do {
-                if try await Task.detached(priority: .background, operation: { try EchoCanceller.clean(sides[0], against: sides[1]) }).value {
-                    log.notice("Took the others' echo out of your side of \(id, privacy: .public) in \(ContinuousClock.now - started)")
+                if let recorded = try await Task.detached(priority: .background, operation: { try EchoCanceller.clean(sides[0], against: sides[1]) }).value {
+                    log.notice("Took the others' echo out of your side of \(id, privacy: .public) in \(ContinuousClock.now - started); as recorded, it's at \(recorded.path, privacy: .public)")
                 }
             } catch {
                 log.error("Couldn't clean your side of the echo: \(error.localizedDescription, privacy: .public)")
