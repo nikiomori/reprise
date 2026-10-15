@@ -280,39 +280,38 @@ nonisolated final class AudioRecorder: @unchecked Sendable {
         let micWeight = micChannels > 0 ? 1 / Float(micChannels) : 0
         let systemWeight = totalChannels > micChannels ? 1 / Float(totalChannels - micChannels) : 0
 
-        out.update(repeating: 0, count: frames)
-        sides?.you.update(repeating: 0, count: frames)
-        sides?.them.update(repeating: 0, count: frames)
+        // vDSP down each channel of the interleaved buffers: on the realtime IO thread, a sample at a
+        // time took a fortieth of the recording's CPU.
+        let n = vDSP_Length(frames)
+        vDSP_vclr(out, 1, n)
+        if let sides { vDSP_vclr(sides.you, 1, n); vDSP_vclr(sides.them, 1, n) }
         var you: Float = 0, them: Float = 0, youEnergy: Float = 0, themEnergy: Float = 0
         var channel = 0
         for buffer in buffers {
             let count = Int(buffer.mNumberChannels)
             defer { channel += count }
             guard count > 0, let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-            let available = min(frames, Int(buffer.mDataByteSize) / (MemoryLayout<Float>.size * count)) // never read past a short buffer
+            let available = vDSP_Length(min(frames, Int(buffer.mDataByteSize) / (MemoryLayout<Float>.size * count))) // never read past a short buffer
             for c in 0..<count {
                 let isMic = channel + c < micChannels
                 // Into a side as it came; into the mix at the side's gain.
-                let weight = (isMic ? micWeight : systemWeight) * (sides != nil ? 1 : isMic ? gains.you : gains.them)
+                var weight = (isMic ? micWeight : systemWeight) * (sides != nil ? 1 : isMic ? gains.you : gains.them)
                 let into = sides.map { isMic ? $0.you : $0.them } ?? out
+                vDSP_vsma(data + c, count, &weight, into, 1, into, 1, available)
                 var loudest: Float = 0, energy: Float = 0
-                for f in 0..<available {
-                    let sample = data[f * count + c]
-                    into[f] += sample * weight
-                    loudest = max(loudest, abs(sample))
-                    energy += sample * sample
-                }
+                vDSP_maxmgv(data + c, count, &loudest, available)
+                vDSP_svesq(data + c, count, &energy, available)
                 if isMic { you = max(you, loudest); youEnergy += energy * micWeight } else { them = max(them, loudest); themEnergy += energy * systemWeight }
             }
         }
+        var low: Float = -1, high: Float = 1
         if let sides {
-            for f in 0..<frames {
-                out[f] = gains.you * sides.you[f] + gains.them * sides.them[f]
-                sides.you[f] = min(1, max(-1, sides.you[f]))
-                sides.them[f] = min(1, max(-1, sides.them[f]))
-            }
+            var (youGain, themGain) = gains
+            vDSP_vsmsma(sides.you, 1, &youGain, sides.them, 1, &themGain, out, 1, n)
+            vDSP_vclip(sides.you, 1, &low, &high, sides.you, 1, n)
+            vDSP_vclip(sides.them, 1, &low, &high, sides.them, 1, n)
         }
-        for f in 0..<frames { out[f] = min(1, max(-1, out[f])) }
+        vDSP_vclip(out, 1, &low, &high, out, 1, n)
         return (frames, you, them, (youEnergy / Float(frames), themEnergy / Float(frames)))
     }
 }
