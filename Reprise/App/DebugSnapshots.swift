@@ -36,13 +36,14 @@ enum DebugSnapshots {
 
     // MARK: Island
 
-    /// A clean gradient "desktop" behind the island, so no real wallpaper or menu bar leaks in.
+    /// A clean "desktop" behind the island, so no real wallpaper or menu bar leaks in: the icon's
+    /// own paper white and graphite, quiet like the app.
     private static func backdrop(around frame: CGRect, dark: Bool) -> NSWindow {
         let window = NSWindow(contentRect: frame.insetBy(dx: -40, dy: -40), styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false // ARC owns it; close() must not release it again
         window.level = .floating
         window.contentView = NSHostingView(rootView: LinearGradient(
-            colors: dark ? [.indigo, .purple.mix(with: .black, by: 0.3)] : [.mint.mix(with: .white, by: 0.3), .blue.mix(with: .white, by: 0.2)],
+            colors: dark ? [Color(white: 0.27), Color(white: 0.13)] : [Color(white: 0.97), Color(white: 0.84)],
             startPoint: .topLeading, endPoint: .bottomTrailing))
         window.orderFrontRegardless()
         return window
