@@ -342,9 +342,11 @@ private struct TranscriptionSettingsView: View {
                 Picker("Service", selection: preset) {
                     Text("None").tag("None")
                     Divider()
-                    ForEach(TranscriptionService.presets, id: \.name) { Text($0.name).tag($0.name) }
+                    ForEach(TranscriptionService.presets, id: \.name) { preset in
+                        Label { Text(preset.name) } icon: { icon(of: preset) }.tag(preset.name)
+                    }
                     Divider()
-                    Text("Custom").tag("Custom")
+                    Label("Custom", systemImage: "network").tag("Custom")
                 }
                 if refrainRunning, baseURL != TranscriptionService.refrain.baseURL {
                     HStack {
@@ -386,6 +388,13 @@ private struct TranscriptionSettingsView: View {
         }
         .formStyle(.grouped)
         .task { refrainRunning = await TranscriptionService.refrainIsRunning() }
+    }
+
+    /// This Mac, a server nearby, or the service's own logo, named after it in the asset catalog.
+    private func icon(of preset: (name: String, service: TranscriptionService)) -> Image {
+        if preset.service.isRefrain { Image(systemName: "laptopcomputer") }
+        else if preset.service.isLocal { Image(systemName: "server.rack") }
+        else { Image(preset.name) }
     }
 
     private var preset: Binding<String> {

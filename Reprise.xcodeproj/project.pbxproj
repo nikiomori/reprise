@@ -23,6 +23,7 @@
 		796A40F671A89D120CEDA539 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7DEFA51BD022745B069C07 /* LibraryView.swift */; };
 		7FAAF0B280BA1AADCD3A49A6 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91D5314F710C5FABF64E3E34 /* MenuBarView.swift */; };
 		823A46C262162C27111ED865 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5EA41968814ACF5C3D8CFAC /* AudioRecorder.swift */; };
+		98D97C703C9350E172448EB4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 24C241E6D3E59E71BA7FCF35 /* Assets.xcassets */; };
 		9CCFD1A41E7DA5519FC3C862 /* AppShortcuts.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8B74C2926E335B3CA694E824 /* AppShortcuts.xcstrings */; };
 		A6664C5B85D3DAAF12320CE0 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0AA994BD5852FCD005070692 /* Localizable.xcstrings */; };
 		AB50DEE52BBD9F8DFE9CEC9D /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBD3826D223B00CA49B5672 /* ScreenRecorder.swift */; };
@@ -75,6 +76,7 @@
 		1D223B7738F8D7E2EEB012EA /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
 		1F393C211ED49E18A8224023 /* RepriseControls.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RepriseControls.entitlements; sourceTree = "<group>"; };
 		20B146D1772A5562897F2A7A /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		24C241E6D3E59E71BA7FCF35 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		28571E0825C5C03BFAA9CA6F /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		31B44F12CAAE4172E145B1ED /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3AF754BB3AA3ED57830AA2ED /* RepriseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepriseApp.swift; sourceTree = "<group>"; };
@@ -140,6 +142,7 @@
 			children = (
 				8E81ABB7728C79F330920819 /* AppIcon.icon */,
 				8B74C2926E335B3CA694E824 /* AppShortcuts.xcstrings */,
+				24C241E6D3E59E71BA7FCF35 /* Assets.xcassets */,
 				08EF97DBBD3CD208C15D737C /* Info.plist */,
 				AD0BD910C3EB44BFE767B269 /* InfoPlist.xcstrings */,
 				0AA994BD5852FCD005070692 /* Localizable.xcstrings */,
@@ -373,6 +376,7 @@
 			files = (
 				33A081B7DA3D70FBF24411CE /* AppIcon.icon in Resources */,
 				9CCFD1A41E7DA5519FC3C862 /* AppShortcuts.xcstrings in Resources */,
+				98D97C703C9350E172448EB4 /* Assets.xcassets in Resources */,
 				FBD186C39D57D14E51358BA3 /* InfoPlist.xcstrings in Resources */,
 				A6664C5B85D3DAAF12320CE0 /* Localizable.xcstrings in Resources */,
 			);
