@@ -48,6 +48,12 @@ targets:
         NSMicrophoneUsageDescription: Reprise records your voice during the calls you choose to record.
         NSAudioCaptureUsageDescription: Reprise records what the other people on the call say.
         NSCalendarsFullAccessUsageDescription: Reprise names each call after the calendar event it belongs to.
+        # Open With… and the Dock icon: a sound file or movie opened with Reprise is added and transcribed.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Audio or Video
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.audiovisual-content]
     entitlements:
       path: Reprise/Resources/Reprise.entitlements
       properties:

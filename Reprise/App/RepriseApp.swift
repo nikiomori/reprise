@@ -115,6 +115,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// A sound file or movie opened with Reprise, from Open With… or the Dock icon: added and transcribed.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        AppModel.shared.add(urls, transcribing: true)
+        NotificationCenter.default.post(name: .openRepriseWindow, object: "library")
+    }
+
     /// A click on a call in Spotlight, when it isn't handed over as Open Call: opens it in the library.
     func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard userActivity.activityType == CSSearchableItemActionType,

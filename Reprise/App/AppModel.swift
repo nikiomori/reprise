@@ -527,22 +527,23 @@ enum IslandState: Equatable {
         }
     }
 
-    /// Adds calls recorded elsewhere, dropped onto the library: each sound file or movie becomes a
-    /// call of its own under the file's name, with its sound copied in. The file stays where it was.
-    func add(_ files: [URL]) {
+    /// Adds calls recorded elsewhere, dropped onto the library or opened with Reprise: each sound file
+    /// or movie becomes a call of its own under the file's name, with its sound copied in. The file stays
+    /// where it was. `transcribing`: right away, whatever Settings say, as for a file handed over to be transcribed.
+    func add(_ files: [URL], transcribing: Bool = false) {
         // Not the library's own calls dragged back in, which would then be in it twice.
         let own = [RecordingStore.root, Recording.copies].map { $0.resolvingSymlinksInPath().path + "/" }
         for file in files where UTType(filenameExtension: file.pathExtension)?.conforms(to: .audiovisualContent) == true
             && !own.contains(where: file.resolvingSymlinksInPath().path.hasPrefix) {
             // A quit waits for it, as for a call being saved: otherwise the call would stay without its sound.
             stopping = Task { [previous = stopping] in
-                await add(file)
+                await add(file, transcribing: transcribing)
                 await previous?.value
             }
         }
     }
 
-    private func add(_ file: URL) async {
+    private func add(_ file: URL, transcribing: Bool) async {
         let name = file.deletingPathExtension().lastPathComponent
         var added: Recording?
         do {
@@ -562,7 +563,7 @@ enum IslandState: Equatable {
             store.save(recording)
             saving.remove(recording.id)
             log.notice("Added \(recording.id, privacy: .public) from a file, \(Int(recording.duration))s")
-            if UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey) { transcribe(recording) }
+            if transcribing || UserDefaults.standard.bool(forKey: TranscriptionSettings.autoKey) { transcribe(recording) }
         } catch {
             log.error("Couldn't add a file: \(error.localizedDescription, privacy: .public)")
             if let added {
