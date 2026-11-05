@@ -91,6 +91,7 @@ On first start, Reprise asks for the **Microphone** (your voice) and **System Au
 - **After each call.** In **Settings > General**, pick a shortcut. It gets the call's folder once it's saved, with the transcript if Reprise transcribes calls automatically.
 - **Space.** **Settings > General > Keep screen recordings** moves older screen recordings to the Trash. The calls stay, with their sound. **Saved in › Change…** keeps new calls in another folder: on another disk, in iCloud Drive, or on a server.
 - **Without a call.** Choose **Start Recording** in the menu bar, or press ⌘N in the library.
+- **A recording from elsewhere.** Share a sound file or movie to Reprise from Finder, Voice Memos or QuickTime, or choose **Open With › Reprise**: it joins the library under its own name and is transcribed. If Reprise isn't in the Share menu, turn it on in **System Settings › General › Login Items & Extensions › Sharing**. Dropped onto the library, a file is transcribed only if calls are.
 
 ## Transcription
 
