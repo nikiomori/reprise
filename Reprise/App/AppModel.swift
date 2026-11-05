@@ -507,7 +507,7 @@ enum IslandState: Equatable {
             model.store.reload()
             model.selection = recording.id
         }
-        undo?.setActionName("Move to Trash")
+        undo?.setActionName(String(localized: "Move to Trash"))
     }
 
     /// Cuts the call down to `range`; Edit > Undo puts the call as it was back.
