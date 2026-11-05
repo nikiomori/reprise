@@ -141,7 +141,7 @@ extension MeetingApp {
         ("app.chime.aws", "Amazon Chime"),
     ]
 
-    // ponytail: the first call site among the tabs; ask which tab plays sound if two calls are open.
+    // ponytail: the first call site among the windows' front tabs; ask which tab plays sound if two calls are open.
     /// The call site among the tabs, and the title of its tab.
     static func callSite(in tabs: [(url: String, title: String)]) -> (name: String, title: String)? {
         for tab in tabs {
@@ -158,30 +158,47 @@ extension MeetingApp {
         return title.isEmpty || title == page || title.wholeMatch(of: /[a-z]{3}-[a-z]{4}-[a-z]{3}/) != nil ? nil : title
     }
 
+    /// Firefox and Zen have no tabs in AppleScript: asked anyway, macOS would ask the user for nothing.
+    private static let tabless: Set = ["org.mozilla.firefox", "app.zen-browser.zen"]
+
     /// The browser under the name of the call site open in it; itself for other apps, a browser
-    /// with no call site open, or one Reprise may not ask (Firefox has no tabs in AppleScript).
+    /// with no call site in front, or one Reprise may not ask.
     func namedAfterCallSite() async -> MeetingApp {
-        guard isBrowser, let site = Self.callSite(in: await Self.tabs(of: id)) else { return self }
+        guard isBrowser, !Self.tabless.contains(id), let site = Self.callSite(in: await Self.frontTabs(of: id)) else { return self }
         return MeetingApp(id: id, name: site.name, page: site.title)
     }
 
-    /// The addresses and titles of the browser's open tabs. Asked with Apple Events: macOS asks once
-    /// whether Reprise may. Two seconds at most, so that question doesn't hold up the prompt to record.
-    nonisolated private static func tabs(of browser: String) async -> [(url: String, title: String)] {
-        // Two events a window, not two a tab: a hundred tabs answer as fast as one.
+    /// Whether Reprise may ask `browser` over Apple Events. Not asked yet: macOS asks the user now, in
+    /// the background, and this call keeps the browser's name, so the question doesn't hold up the
+    /// prompt to record, nor is it cut off by a timeout.
+    nonisolated private static func mayAsk(_ browser: String) -> Bool {
+        let status = permission(browser, ask: false)
+        if status == OSStatus(errAEEventWouldRequireUserConsent) { Task.detached { _ = permission(browser, ask: true) } }
+        return status == noErr
+    }
+
+    nonisolated private static func permission(_ browser: String, ask: Bool) -> OSStatus {
+        var target = AEAddressDesc()
+        let id = Array(browser.utf8)
+        guard AECreateDesc(DescType(typeApplicationBundleID), id, id.count, &target) == noErr else { return OSStatus(procNotFound) }
+        defer { AEDisposeDesc(&target) }
+        return AEDeterminePermissionToAutomateTarget(&target, AEEventClass(typeWildCard), AEEventID(typeWildCard), ask)
+    }
+
+    /// The address and title of the tab in front in each of the browser's windows, front window first:
+    /// a call is on its tab, and a window is titled after that tab. Not every open tab, which the call
+    /// has nothing to do with. Two seconds at most.
+    nonisolated private static func frontTabs(of browser: String) async -> [(url: String, title: String)] {
+        guard mayAsk(browser) else { return [] }
+        let safari = browser == "com.apple.Safari"
         let script = """
             set sep to tab
             set found to {}
             tell application id "\(browser)"
                 repeat with w in windows
                     try
-                        set urls to URL of every tab of w
-                        set titles to \(browser == "com.apple.Safari" ? "name" : "title") of every tab of w
-                        repeat with i from 1 to count of urls
-                            try
-                                set end of found to (item i of urls) & sep & (item i of titles)
-                            end try
-                        end repeat
+                        set t to \(safari ? "current tab" : "active tab") of w
+                        set end of found to (URL of t) & sep & (\(safari ? "name" : "title") of t)
                     end try
                 end repeat
             end tell
