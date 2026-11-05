@@ -381,8 +381,8 @@ enum IslandState: Equatable {
         }
     }
 
-    /// Your side being cleaned of the others' echo, by call.
-    @ObservationIgnored private var echoes: [Recording.ID: Task<Void, Never>] = [:]
+    /// Your side being cleaned of the others' echo, by call. Observed, for `isBusy`.
+    private var echoes: [Recording.ID: Task<Void, Never>] = [:]
 
     // ponytail: a quit mid-cleaning leaves you-cleaned.m4a in the folder and your side as recorded;
     // nothing cleans it again. Redo it at launch if that turns out to matter.
@@ -402,8 +402,10 @@ enum IslandState: Equatable {
             } catch {
                 log.error("Couldn't clean your side of the echo: \(error.localizedDescription, privacy: .public)")
             }
-            echoes[id] = nil
-            Task(priority: .medium) { done() }
+            Task(priority: .medium) {
+                done()
+                echoes[id] = nil // after: a transcription asked for by `done` has started, so `isBusy` never lapses
+            }
         }
     }
 
@@ -498,6 +500,10 @@ enum IslandState: Equatable {
         store.save(recording)
         if session?.recording.id == recording.id { session?.recording.favorite = recording.favorite }
     }
+
+    /// Something is writing into a call's folder: the library mustn't move to another folder now, or
+    /// it would write to the folder of the same name there, which isn't.
+    var isBusy: Bool { session != nil || preroll != nil || !saving.isEmpty || !echoes.isEmpty || !transcribing.isEmpty }
 
     /// Being recorded or saved: its files aren't done yet.
     func isLive(_ recording: Recording) -> Bool {

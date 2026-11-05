@@ -68,7 +68,7 @@ private struct GeneralSettings: View {
                 LabeledContent {
                     Button("Show in Finder") { model.store.revealInFinder() }
                     Button("Change…", action: chooseLibrary)
-                        .disabled(model.session != nil || model.preroll != nil || !model.saving.isEmpty) // never under a recording
+                        .disabled(model.isBusy) // never under a recording, its echo removal or a transcription
                 } label: {
                     Text("Saved in")
                     let path = library.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~")
