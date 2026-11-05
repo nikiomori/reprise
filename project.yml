@@ -37,6 +37,7 @@ targets:
       # without an explicit link the player view's superclass is missing at runtime.
       - sdk: AVKit.framework
       - target: RepriseControls
+      - target: RepriseShare
     info:
       path: Reprise/Resources/Info.plist
       properties:
@@ -89,6 +90,32 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.nikiomori.reprise.controls
         PRODUCT_NAME: RepriseControls
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) CONTROLS
+  # Share › Reprise for sound files and movies: hands them to the app to add and transcribe.
+  RepriseShare:
+    type: app-extension
+    platform: macOS
+    sources: [RepriseShare]
+    info:
+      path: RepriseShare/Info.plist
+      properties:
+        CFBundleDisplayName: Reprise
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule: >-
+              SUBQUERY(extensionItems, $item, SUBQUERY($item.attachments, $file,
+              ANY $file.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audiovisual-content").@count > 0).@count > 0
+    entitlements:
+      path: RepriseShare/RepriseShare.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.nikiomori.reprise.share
+        PRODUCT_NAME: RepriseShare
   RepriseTests:
     type: bundle.unit-test
     platform: macOS
