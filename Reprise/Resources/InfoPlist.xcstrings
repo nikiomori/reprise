@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "NSAppleEventsUsageDescription" : {
+      "comment" : "Privacy - AppleEvents Sending Usage Description",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise смотрит открытые вкладки браузера, чтобы назвать веб-звонок по сайту, например Google Meet."
+          }
+        }
+      }
+    },
     "NSAudioCaptureUsageDescription" : {
       "comment" : "Privacy - Audio Capture Usage Description",
       "localizations" : {

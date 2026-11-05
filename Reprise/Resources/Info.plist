@@ -37,6 +37,8 @@
 	<string>public.app-category.productivity</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Reprise looks at the browser's open tabs to name a web call after its site, like Google Meet.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Reprise records what the other people on the call say.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>

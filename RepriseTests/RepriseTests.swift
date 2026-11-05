@@ -28,6 +28,19 @@ import Testing
         #expect(MeetingApp.matching(processBundleID: bundleID) == nil)
     }
 
+    @Test func findsTheCallSiteAmongTabs() {
+        let meet = MeetingApp.callSite(in: [("https://mail.google.com/", "Inbox"), ("https://meet.google.com/abc-defg-hij", "Meet – Weekly sync")])
+        #expect(meet?.name == "Google Meet" && meet?.title == "Meet – Weekly sync")
+        #expect(MeetingApp.callSite(in: [("https://us02web.zoom.us/wc/123/join", "")])?.name == "Zoom")
+        #expect(MeetingApp.callSite(in: [("missing value", ""), ("https://notzoom.us/", ""), ("https://google.com/meet", "")]) == nil)
+    }
+
+    @Test(arguments: [("Meet – Weekly sync", "Weekly sync"), ("Meet - abc-defg-hij", nil), ("Meet", nil), ("Google Meet", nil)])
+    func namesTheMeetFromItsTab(page: String, meeting: String?) {
+        #expect(MeetingApp(id: "com.google.Chrome", name: "Google Meet", page: page).meeting == meeting)
+        #expect(MeetingApp(id: "com.google.Chrome", name: "Zoom", page: page).meeting == nil)
+    }
+
     /// A call in `avconferenced` is FaceTime's when it's in front or open alone, else the Phone's.
     @Test func conferenceDaemonGoesToTheCallApp() {
         let (faceTime, phone) = (MeetingApp.faceTime.id, MeetingApp.phone.id)

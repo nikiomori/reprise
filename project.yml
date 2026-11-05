@@ -49,6 +49,7 @@ targets:
         NSMicrophoneUsageDescription: Reprise records your voice during the calls you choose to record.
         NSAudioCaptureUsageDescription: Reprise records what the other people on the call say.
         NSCalendarsFullAccessUsageDescription: Reprise names each call after the calendar event it belongs to.
+        NSAppleEventsUsageDescription: Reprise looks at the browser's open tabs to name a web call after its site, like Google Meet.
         # Open With… and the Dock icon: a sound file or movie opened with Reprise is added and transcribed.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Audio or Video
@@ -60,6 +61,7 @@ targets:
       properties:
         com.apple.security.device.audio-input: true
         com.apple.security.personal-information.calendars: true
+        com.apple.security.automation.apple-events: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.nikiomori.reprise

@@ -92,13 +92,18 @@ enum IslandState: Equatable {
 
     private func callStarted(_ app: MeetingApp) {
         log.notice("Call started in \(app.id, privacy: .public), rule: \(app.rule.rawValue, privacy: .public)")
-        guard session == nil else { return }
-        switch app.rule {
-        case .always: Task { await startRecording(app: app) }
-        case .ask:
-            show(.prompt(app), for: .seconds(Self.promptSeconds))
-            if UserDefaults.standard.bool(forKey: "recordFromStart") { startPreroll(app) }
-        case .never: break
+        guard session == nil, app.rule != .never else { return }
+        Task {
+            let app = await app.namedAfterCallSite() // a web call under its site: "Google Meet call"
+            // The call ended, or a recording started, while the browser was asked.
+            guard session == nil, detector.active.contains(app) else { return }
+            switch app.rule {
+            case .always: await startRecording(app: app)
+            case .ask:
+                show(.prompt(app), for: .seconds(Self.promptSeconds))
+                if UserDefaults.standard.bool(forKey: "recordFromStart") { startPreroll(app) }
+            case .never: break
+            }
         }
     }
 

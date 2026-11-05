@@ -4,6 +4,10 @@ import CoreAudio
 struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     let id: String // bundle ID of the app the user sees
     let name: String
+    /// A web call's tab title: it finds the call's window, and Meet's names the meeting. Not saved.
+    var page: String? = nil
+
+    private enum CodingKeys: CodingKey { case id, name }
 
     var icon: NSImage? {
         if let cached = Self.icons[id] { return cached }
@@ -113,6 +117,95 @@ struct MeetingApp: Hashable, Codable, Identifiable, Sendable {
     static var seen: [MeetingApp] {
         get { (UserDefaults.standard.data(forKey: "seenApps")).flatMap { try? JSONDecoder().decode([MeetingApp].self, from: $0) } ?? [] }
         set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: "seenApps") }
+    }
+}
+
+/// Web calls: which site in the browser has the call, so it's "Google Meet", not "Google Chrome".
+extension MeetingApp {
+    /// By host, subdomains included.
+    private static let callSites = [
+        ("meet.google.com", "Google Meet"),
+        ("zoom.us", "Zoom"), ("zoom.com", "Zoom"),
+        ("teams.microsoft.com", "Microsoft Teams"), ("teams.live.com", "Microsoft Teams"), ("teams.cloud.microsoft", "Microsoft Teams"),
+        ("webex.com", "Webex"),
+        ("meet.jit.si", "Jitsi Meet"),
+        ("telemost.yandex.ru", "Yandex Telemost"), ("telemost.yandex.com", "Yandex Telemost"), ("telemost.360.yandex.ru", "Yandex Telemost"),
+        ("ktalk.ru", "Kontur Talk"),
+        ("calls.vk.com", "VK Calls"),
+        ("app.slack.com", "Slack"),
+        ("discord.com", "Discord"),
+        ("web.whatsapp.com", "WhatsApp"),
+        ("web.telegram.org", "Telegram"),
+        ("facetime.apple.com", "FaceTime"),
+        ("whereby.com", "Whereby"),
+        ("app.chime.aws", "Amazon Chime"),
+    ]
+
+    // ponytail: the first call site among the tabs; ask which tab plays sound if two calls are open.
+    /// The call site among the tabs, and the title of its tab.
+    static func callSite(in tabs: [(url: String, title: String)]) -> (name: String, title: String)? {
+        for tab in tabs {
+            guard let host = URL(string: tab.url)?.host()?.lowercased() else { continue }
+            if let site = callSites.first(where: { host == $0.0 || host.hasSuffix("." + $0.0) }) { return (site.1, tab.title) }
+        }
+        return nil
+    }
+
+    /// The meeting's name in Meet's tab title, "Meet – Weekly sync"; none while it's only the meeting's code.
+    var meeting: String? {
+        guard name == "Google Meet", let page else { return nil }
+        let title = page.replacing(/^Meet\s*[–:-]\s*/, with: "").trimmingCharacters(in: .whitespaces)
+        return title.isEmpty || title == page || title.wholeMatch(of: /[a-z]{3}-[a-z]{4}-[a-z]{3}/) != nil ? nil : title
+    }
+
+    /// The browser under the name of the call site open in it; itself for other apps, a browser
+    /// with no call site open, or one Reprise may not ask (Firefox has no tabs in AppleScript).
+    func namedAfterCallSite() async -> MeetingApp {
+        guard isBrowser, let site = Self.callSite(in: await Self.tabs(of: id)) else { return self }
+        return MeetingApp(id: id, name: site.name, page: site.title)
+    }
+
+    /// The addresses and titles of the browser's open tabs. Asked with Apple Events: macOS asks once
+    /// whether Reprise may. Two seconds at most, so that question doesn't hold up the prompt to record.
+    nonisolated private static func tabs(of browser: String) async -> [(url: String, title: String)] {
+        // Two events a window, not two a tab: a hundred tabs answer as fast as one.
+        let script = """
+            set sep to tab
+            set found to {}
+            tell application id "\(browser)"
+                repeat with w in windows
+                    try
+                        set urls to URL of every tab of w
+                        set titles to \(browser == "com.apple.Safari" ? "name" : "title") of every tab of w
+                        repeat with i from 1 to count of urls
+                            try
+                                set end of found to (item i of urls) & sep & (item i of titles)
+                            end try
+                        end repeat
+                    end try
+                end repeat
+            end tell
+            set AppleScript's text item delimiters to linefeed
+            return found as text
+            """
+        return await Task.detached {
+            let process = Process()
+            process.executableURL = URL(filePath: "/usr/bin/osascript")
+            process.arguments = ["-e", script]
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return [] }
+            let timeout = DispatchWorkItem { [process] in process.terminate() }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 2, execute: timeout)
+            let data = (try? output.fileHandleForReading.readToEnd()) ?? nil
+            process.waitUntilExit()
+            timeout.cancel()
+            return String(decoding: data ?? Data(), as: UTF8.self).split(separator: "\n").map {
+                let parts = $0.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
+                return (String(parts[0]), parts.count > 1 ? String(parts[1]) : "")
+            }
+        }.value
     }
 }
 

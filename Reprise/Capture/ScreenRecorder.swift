@@ -24,14 +24,15 @@ nonisolated final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelega
 
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
-    /// Records the display that shows the call: the one under the call app's largest window,
-    /// otherwise the one with the menu bar.
+    /// Records the display that shows the call: the one under the window of the call's tab, or the
+    /// call app's largest window, otherwise the one with the menu bar.
     func start(url: URL, showing app: MeetingApp?) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let area = { (rect: CGRect) in rect.isNull ? 0 : rect.width * rect.height }
-        let callWindow = content.windows
-            .filter { $0.windowLayer == 0 && $0.owningApplication?.bundleIdentifier == app?.id }
-            .max { area($0.frame) < area($1.frame) }
+        let appWindows = content.windows.filter { $0.windowLayer == 0 && $0.owningApplication?.bundleIdentifier == app?.id }
+        // A browser's window is titled after its tab in front: the call's, when it's on.
+        let callWindow = appWindows.first { window in app?.page.map { !$0.isEmpty && window.title?.contains($0) == true } == true }
+            ?? appWindows.max { area($0.frame) < area($1.frame) }
         let underCall = callWindow.flatMap { window in
             content.displays.max { area($0.frame.intersection(window.frame)) < area($1.frame.intersection(window.frame)) }
         }

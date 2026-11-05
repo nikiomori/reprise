@@ -203,7 +203,7 @@ enum CalendarEvents {
             }
         }
         let event = CalendarEvents.event(at: date)
-        let title = event?.title.flatMap { $0.isEmpty ? nil : $0 } ?? app.map { String(localized: "\($0.name) call") } ?? String(localized: "Recording")
+        let title = event?.title.flatMap { $0.isEmpty ? nil : $0 } ?? app?.meeting ?? app.map { String(localized: "\($0.name) call") } ?? String(localized: "Recording")
         let participants = event.map(CalendarEvents.participants)
         return Recording(id: id, title: title, app: app, startedAt: date, duration: 0, hasVideo: false,
                          participants: participants?.isEmpty == false ? participants : nil)
