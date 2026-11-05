@@ -125,13 +125,15 @@ enum IslandState: Equatable {
     static let promptSeconds: TimeInterval = 20
 
     @ObservationIgnored private var starting = false
+    /// The call starting: in the library before the screen starts, and live already.
+    @ObservationIgnored private var startingID: Recording.ID?
     @ObservationIgnored private var prerolling: Task<Void, Never>?
 
     func startRecording(app: MeetingApp?) async {
         await prerolling?.value // Record was pressed while the early capture was still starting
         guard session == nil, !starting else { return } // a double-click must not start two recorders
         starting = true
-        defer { starting = false }
+        defer { (starting, startingID) = (false, nil) }
         do {
             var recording: Recording
             let audio: AudioRecorder
@@ -149,6 +151,10 @@ enum IslandState: Equatable {
                     throw error
                 }
             }
+            // Saved before the screen starts, which takes a while: a crash meanwhile left sound
+            // without recording.json, an unanswered prompt's to the next launch, which deleted it.
+            startingID = recording.id
+            store.save(recording)
 
             // Keep the audio going without the screen; a call is more important than its picture.
             var screen: ScreenRecorder?
@@ -179,7 +185,7 @@ enum IslandState: Equatable {
             }
             session = Session(recording: recording, audio: audio, screen: screen)
             log.notice("Recording started: \(recording.id, privacy: .public), screen: \(screen != nil)")
-            store.save(recording) // visible in the library right away, even if Reprise quits mid-call
+            if recording.hasVideo { store.save(recording) }
             pillHidden = !UserDefaults.standard.bool(forKey: "showRecordingPill")
             pillHidden ? show(.recording, for: .seconds(2)) : show(.recording)
             if let screenProblem { show(.problem(screenProblem), for: .seconds(8)) }
@@ -494,7 +500,9 @@ enum IslandState: Equatable {
     }
 
     /// Being recorded or saved: its files aren't done yet.
-    func isLive(_ recording: Recording) -> Bool { session?.recording.id == recording.id || saving.contains(recording.id) }
+    func isLive(_ recording: Recording) -> Bool {
+        session?.recording.id == recording.id || startingID == recording.id || saving.contains(recording.id)
+    }
 
     /// `shown`: the library's list as it's shown, maybe searched.
     func delete(_ recording: Recording, shown: [Recording], undo: UndoManager?) {
