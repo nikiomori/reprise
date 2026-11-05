@@ -230,7 +230,7 @@ nonisolated enum Transcriber {
 
     /// What a request asks for: phrases with who said them (`diarized_json`, OpenAI's dialect for
     /// it), phrases with times (`verbose_json`), or text (`json`).
-    private enum Format: String { case diarized = "diarized_json", timed = "verbose_json", text = "json" }
+    enum Format: String { case diarized = "diarized_json", timed = "verbose_json", text = "json" }
 
     /// The formats a cloud service turned down since launch, by endpoint and model: each call to it
     /// uploaded a piece only to be turned down again, up to twice. Not a service on this Mac or the
@@ -334,7 +334,9 @@ nonisolated enum Transcriber {
         guard (200..<300).contains(status) else {
             // A service that can't time its text or tell voices apart turns the format down as a bad request.
             if format != .text, [400, 422].contains(status) {
-                if let key = key(format, service) { _ = turnedDown.withLock { $0.insert(key) } }
+                // Remembered only when it's the format the service turned down: a bad request for
+                // another reason (a wrong language) kept speakers out of every transcript until a relaunch.
+                if let key = key(format, service), turnsDown(format, answer: data) { _ = turnedDown.withLock { $0.insert(key) } }
                 throw Unsupported()
             }
             let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error.message
@@ -350,6 +352,13 @@ nonisolated enum Transcriber {
         }
         return segments.map { var segment = $0; segment.text = $0.text.trimmingCharacters(in: .whitespacesAndNewlines); return segment }
             .filter { !$0.text.isEmpty }
+    }
+
+    /// The answer to a bad request names the format or its field: "response_format 'verbose_json' is not
+    /// compatible with model…", or a validation error's `"loc": ["body", "response_format"]`.
+    static func turnsDown(_ format: Format, answer: Data) -> Bool {
+        let text = String(decoding: answer, as: UTF8.self)
+        return text.contains("response_format") || text.contains(format.rawValue)
     }
 
     private struct Unsupported: Error {}

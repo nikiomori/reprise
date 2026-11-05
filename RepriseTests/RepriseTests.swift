@@ -699,6 +699,16 @@ struct TranscriptTests {
         let segments = try JSONDecoder().decode(Transcript.self, from: Data(answer.utf8)).segments
         #expect(segments.map(\.speaker) == ["A", "B"] && segments[1].end == 4)
     }
+
+    /// Only a bad request about the format keeps it from being asked for again.
+    @Test func remembersOnlyAFormatTurnedDown() {
+        let openAI = #"{"error":{"message":"response_format 'verbose_json' is not compatible with model 'gpt-4o-transcribe'."}}"#
+        let validation = #"{"detail":[{"loc":["body","response_format"],"msg":"value is not a valid enumeration member"}]}"#
+        let language = #"{"error":{"message":"Invalid language 'xx'. Language parameter must be specified in ISO-639-1 format."}}"#
+        #expect(Transcriber.turnsDown(.timed, answer: Data(openAI.utf8)))
+        #expect(Transcriber.turnsDown(.diarized, answer: Data(validation.utf8)))
+        #expect(!Transcriber.turnsDown(.timed, answer: Data(language.utf8)))
+    }
 }
 
 @MainActor struct RecordingControlTests {
