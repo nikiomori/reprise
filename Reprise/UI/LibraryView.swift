@@ -30,8 +30,11 @@ struct LibraryView: View {
             // every call, the window closed or not.
             .contextMenu(forSelectionType: Recording.ID.self) { ids in
                 if let recording = shown.first(where: { ids.contains($0.id) }) {
-                    ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
-                        .disabled(model.isLive(recording)) // its file is still being written
+                    Group {
+                        ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
+                        ShareLink("Share Whole Call as ZIP…", item: CallArchive(recording), preview: SharePreview(recording.title))
+                    }
+                    .disabled(model.isLive(recording)) // its file is still being written
                     Button("Show in Finder") { model.store.revealInFinder(recording) }
                     Button(recording.favorite == true ? "Remove from Favorites" : "Add to Favorites") { model.toggleFavorite(recording) }
                     Divider()
@@ -263,8 +266,13 @@ private struct RecordingDetail: View {
                 let favorite = recording.favorite == true
                 Button(favorite ? "Remove from Favorites" : "Add to Favorites", systemImage: favorite ? "star.fill" : "star") { model.toggleFavorite(recording) }
                     .keyboardShortcut("d") // as a page is added to favorites in a browser
-                ShareLink(item: CallFile(recording), preview: SharePreview(recording.title))
-                    .disabled(model.isLive(recording))
+                // The recording, or everything the call has, zipped: for a messenger, where a folder won't go.
+                Menu("Share", systemImage: "square.and.arrow.up") {
+                    ShareLink("Recording", item: CallFile(recording), preview: SharePreview(recording.title))
+                    ShareLink("Whole Call as ZIP", item: CallArchive(recording), preview: SharePreview(recording.title))
+                }
+                .disabled(model.isLive(recording))
+                .help("Share the recording, or the whole call with its transcript")
                 Button("Show in Finder", systemImage: "folder") { model.store.revealInFinder(recording) }
                 // No confirmation, like Finder: Edit > Undo puts it back.
                 Button("Move to Trash", systemImage: "trash") { model.delete(recording, shown: shown, undo: undoManager) }
@@ -631,6 +639,25 @@ private struct PartFrame: View {
     private func move(_ isStart: Bool, to time: TimeInterval, snapping: TimeInterval) {
         let time = marks.first { abs($0 - time) <= snapping } ?? time
         part = isStart ? max(0, min(time, part.upperBound - 1))...part.upperBound : part.lowerBound...min(duration, max(time, part.lowerBound + 1))
+    }
+}
+
+/// The whole call for Share, as a ZIP of its folder: zipped as it's shared, not at each click.
+nonisolated struct CallArchive: Transferable {
+    let folder: URL
+    let title: String
+    let copies: URL
+
+    @MainActor init(_ recording: Recording) {
+        folder = recording.folder
+        title = recording.title
+        copies = recording.copiesFolder
+    }
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .zip) { call in
+            SentTransferredFile(try await Task.detached { try RecordingStore.archive(call.folder, title: call.title, into: call.copies) }.value)
+        }
     }
 }
 

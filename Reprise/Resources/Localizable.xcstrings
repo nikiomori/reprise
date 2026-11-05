@@ -1894,6 +1894,26 @@
         }
       }
     },
+    "Share Whole Call as ZIP…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться всем звонком в ZIP…"
+          }
+        }
+      }
+    },
+    "Share the recording, or the whole call with its transcript" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться записью или всем звонком с транскриптом"
+          }
+        }
+      }
+    },
     "Share this part as a file of its own" : {
       "localizations" : {
         "ru" : {
@@ -2440,6 +2460,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Пока Reprise спрашивает, он уже записывает. Нажмите «Записать», чтобы сохранить звонок с самого начала. Если не нажмёте, Reprise удалит этот звук."
+          }
+        }
+      }
+    },
+    "Whole Call as ZIP" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Весь звонок в ZIP"
           }
         }
       }

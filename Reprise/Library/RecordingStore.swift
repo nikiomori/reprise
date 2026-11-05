@@ -303,6 +303,19 @@ enum CalendarEvents {
         return clip
     }
 
+    /// The call's whole folder (sound, tracks, screen, transcript) as one ZIP under the call's title,
+    /// zipped by the system as Finder's Compress does. Made as it's shared: the file can be large.
+    nonisolated static func archive(_ folder: URL, title: String, into copies: URL) throws -> URL {
+        let zip = copies.appending(path: UUID().uuidString).appending(path: "\(title.replacingOccurrences(of: "/", with: "-")).zip")
+        try FileManager.default.createDirectory(at: zip.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var failure: NSError?, moved: Error?
+        NSFileCoordinator().coordinate(readingItemAt: folder, options: .forUploading, error: &failure) { zipped in
+            do { try FileManager.default.moveItem(at: zipped, to: zip) } catch { moved = error } // gone once this returns
+        }
+        if let error = failure ?? moved { throw error }
+        return zip
+    }
+
     /// Cuts the call down to `range`: each of its files, its marks and its transcript. The call as
     /// it was goes to the Trash; returns where, for Undo, if the Trash said.
     func trim(_ recording: Recording, to range: ClosedRange<TimeInterval>) async throws -> URL? {
