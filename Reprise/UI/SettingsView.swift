@@ -41,11 +41,11 @@ private struct GeneralSettings: View {
     @State private var librarySize: Int64?
     @State private var shortcuts: [String] = []
     @AppStorage("screenAccessRequested") private var screenRequested = false
-    @AppStorage("systemAudioHeard") private var systemAudioHeard = false
     @AppStorage(Updater.autoKey) private var checkForUpdates = true
     @State private var loginItem = SMAppService.mainApp.status
     @State private var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screen = ScreenRecorder.hasPermission
+    @State private var systemAudio = PermissionGuide.Kind.systemAudio.isGranted
 
     var body: some View {
         Form {
@@ -142,13 +142,11 @@ private struct GeneralSettings: View {
                                   _ = await AVCaptureDevice.requestAccess(for: .audio)
                                   microphone = AVCaptureDevice.authorizationStatus(for: .audio)
                               })
-                // macOS can't be asked about this one; a recording that heard the other side proves it.
-                PermissionRow(title: "System audio", detail: systemAudioHeard ? "Everyone else on the call" : "Everyone else — macOS asks the first time you record",
-                              granted: systemAudioHeard ? true : nil, pane: "Privacy_AudioCapture")
+                PermissionRow(title: "System audio", detail: "Everyone else on the call", granted: systemAudio, pane: "Privacy_AudioCapture")
                 PermissionRow(title: "Screen recording", detail: "Only if you record the screen", granted: screen, pane: "Privacy_ScreenCapture",
                               allow: screenRequested ? nil : {
                                   screenRequested = true
-                                  CGRequestScreenCaptureAccess()
+                                  PermissionRow.open("Privacy_ScreenCapture")
                               })
                 if calendarTitles {
                     PermissionRow(title: "Calendars", detail: "To name calls after their events", granted: calendars, pane: "Privacy_Calendars")
@@ -169,6 +167,7 @@ private struct GeneralSettings: View {
             loginItem = SMAppService.mainApp.status
             microphone = AVCaptureDevice.authorizationStatus(for: .audio)
             screen = ScreenRecorder.hasPermission
+            systemAudio = PermissionGuide.Kind.systemAudio.isGranted
             calendars = CalendarEvents.isAllowed
         }
     }
@@ -255,9 +254,13 @@ struct PermissionRow: View {
         }
     }
 
-    /// Opens the pane of Privacy & Security in System Settings.
+    /// Opens the pane of Privacy & Security in System Settings, with Reprise's permissions beside it.
     static func open(_ pane: String) {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
+        guard let kind = PermissionGuide.Kind(rawValue: pane) else {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
+            return
+        }
+        PermissionGuide.shared.open(kind)
     }
 }
 

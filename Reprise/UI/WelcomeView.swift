@@ -44,7 +44,7 @@ struct WelcomeView: View {
                         relaunch()
                     } else {
                         screenRequested = true
-                        CGRequestScreenCaptureAccess()
+                        PermissionRow.open("Privacy_ScreenCapture")
                     }
                 }
             }

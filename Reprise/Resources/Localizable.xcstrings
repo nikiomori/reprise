@@ -163,6 +163,16 @@
         }
       }
     },
+    "Allow…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить…"
+          }
+        }
+      }
+    },
     "Already switched it on?" : {
       "localizations" : {
         "ru" : {
@@ -589,6 +599,16 @@
         }
       }
     },
+    "Drag the icon into the list" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перетащите значок в список"
+          }
+        }
+      }
+    },
     "Duration" : {
       "localizations" : {
         "ru" : {
@@ -615,16 +635,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Все остальные участники звонка"
-          }
-        }
-      }
-    },
-    "Everyone else — macOS asks the first time you record" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все остальные — macOS спросит при первой записи"
           }
         }
       }

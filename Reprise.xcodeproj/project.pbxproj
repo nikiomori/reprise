@@ -18,6 +18,7 @@
 		494A4567C0927B18CAD22283 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 99DE1BB9800605B201A7E21C /* Localizable.xcstrings */; };
 		591DB9213208ADFD9A881DC1 /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9043239B474E12ECE71F5FD /* MeetingDetector.swift */; };
 		6C7C5F6DBA86C3A26F028811 /* RepriseControls.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7CFA3FB35EBD9428265A0876 /* RepriseControls.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6D28C0B2C85A94A0BF07F57B /* PermissionGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFDF5A5F2FE8DAE08F2485C /* PermissionGuide.swift */; };
 		72B98AB439F24FAA4FFA81DF /* RecordingControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E82B82F32217F8270628030C /* RecordingControl.swift */; };
 		7338E93501383CEC6BE17B3C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 892A0B78D5E7B007506D76FF /* SettingsView.swift */; };
 		781B3558C56B51B3FC2C62BA /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C11AE3AAEAC84F35BDD60BA8 /* AVKit.framework */; };
@@ -119,6 +120,7 @@
 		E82B82F32217F8270628030C /* RecordingControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingControl.swift; sourceTree = "<group>"; };
 		E82CE4AFB2ECB01BB6C1618C /* Reprise.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Reprise.entitlements; sourceTree = "<group>"; };
 		EC49C9C574B9EDCD3B3B6CA0 /* Transcriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transcriber.swift; sourceTree = "<group>"; };
+		FEFDF5A5F2FE8DAE08F2485C /* PermissionGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionGuide.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -183,6 +185,7 @@
 				81C1FDC30EE7E8205BF02A6B /* Island.swift */,
 				7B7DEFA51BD022745B069C07 /* LibraryView.swift */,
 				91D5314F710C5FABF64E3E34 /* MenuBarView.swift */,
+				FEFDF5A5F2FE8DAE08F2485C /* PermissionGuide.swift */,
 				892A0B78D5E7B007506D76FF /* SettingsView.swift */,
 				530209C8AB6693871B1104C6 /* WelcomeView.swift */,
 			);
@@ -464,6 +467,7 @@
 				796A40F671A89D120CEDA539 /* LibraryView.swift in Sources */,
 				591DB9213208ADFD9A881DC1 /* MeetingDetector.swift in Sources */,
 				7FAAF0B280BA1AADCD3A49A6 /* MenuBarView.swift in Sources */,
+				6D28C0B2C85A94A0BF07F57B /* PermissionGuide.swift in Sources */,
 				4744351757BD00328B62DE85 /* RecordingControl.swift in Sources */,
 				3FF9052E9909A478527C5BC4 /* RecordingStore.swift in Sources */,
 				F5CAC0F1C3EF214CAD305B9A /* RepriseApp.swift in Sources */,
