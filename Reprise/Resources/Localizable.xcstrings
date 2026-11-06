@@ -599,12 +599,12 @@
         }
       }
     },
-    "Drag the icon into the list" : {
+    "Drag the icon above into the list" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перетащите значок в список"
+            "value" : "Перетащите значок сверху в список"
           }
         }
       }

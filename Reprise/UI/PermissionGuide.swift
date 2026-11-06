@@ -3,7 +3,7 @@ import EventKit
 import SwiftUI
 
 /// Reprise's permissions, docked beside System Settings while one of its privacy lists is open:
-/// each one's state as it changes, and Reprise's icon hovering over the list for the ones that
+/// each one's state as it changes, and Reprise's icon in its header to drag into the lists that
 /// take an app dropped on them. Nobody hunts for the app or wonders whether it worked.
 @Observable final class PermissionGuide {
     enum Kind: String, CaseIterable, Identifiable {
@@ -15,11 +15,10 @@ import SwiftUI
     static let shared = PermissionGuide()
     private(set) var active: Kind?
     private(set) var granted: Set<Kind> = []
-    /// The icon is out over System Settings' list, so the one in the panel's header greys out.
-    private(set) var iconOut = false
+    /// The list open in System Settings waits for Reprise's icon.
+    var wantsDrop: Bool { active.map { $0.takesDrop && !granted.contains($0) } ?? false }
 
     private var panel: NSPanel?
-    private var icon: NSPanel?
     private var follow: Task<Void, Never>?
     private var closing: NSObjectProtocol?
     /// Reprise's own windows, out of the way while the guide is up.
@@ -39,14 +38,14 @@ import SwiftUI
         }
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(kind.rawValue)")!)
         if panel == nil {
-            makePanels()
+            makePanel()
             // The guide takes the place of the window it was asked from. Picking the icon up makes
             // Reprise the active app, and macOS brings its windows forward: the welcome window or
             // Settings covered the list and caught the drop.
             hidden = NSApp.windows.filter { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
             hidden.forEach { $0.orderOut(nil) }
         }
-        settingsFrame = nil // place again, and send the icon out over the list just opened
+        settingsFrame = nil // place again beside the list just opened
         if follow == nil { follow = Task { await run() } }
     }
 
@@ -55,13 +54,11 @@ import SwiftUI
         follow = nil
         closing.map(NotificationCenter.default.removeObserver)
         closing = nil
-        let windows = [panel, icon]
-        panel = nil
-        icon = nil
-        windows.forEach { $0?.close() }
+        let panel = panel
+        self.panel = nil
+        panel?.close()
         hidden.forEach { $0.orderFront(nil) }
         hidden = []
-        iconOut = false
         active = nil
     }
 
@@ -100,14 +97,13 @@ import SwiftUI
             let front = NSWorkspace.shared.frontmostApplication
             let shown = front?.activationPolicy != .regular || [Self.settingsID, Bundle.main.bundleIdentifier].contains(front?.bundleIdentifier)
             shown ? panel.orderFront(nil) : panel.orderOut(nil)
-            placeIcon(over: frame, shown: shown)
             try? await Task.sleep(for: .milliseconds(500))
         }
     }
 
     // MARK: - Windows
 
-    private func makePanels() {
+    private func makePanel() {
         let content = FirstClickHosting(rootView: AnyView(GuideView(guide: self)))
         let panel = NSPanel(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
                             backing: .buffered, defer: true)
@@ -117,6 +113,9 @@ import SwiftUI
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.level = .floating
         panel.hidesOnDeactivate = false // Reprise isn't the active app while System Settings is
+        // Never key: a nonactivating panel that is takes the keyboard from System Settings, and the
+        // password typed into its prompt for the dropped icon went to Reprise.
+        panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
         panel.contentView = content
         panel.setContentSize(content.fittingSize)
@@ -125,24 +124,10 @@ import SwiftUI
         panel.setFrameOrigin(CGPoint(x: from.midX - panel.frame.width / 2, y: from.midY - panel.frame.height / 2))
         panel.orderFront(nil)
         self.panel = panel
-        // Its close button puts the icon away too.
         closing = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: panel, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.close() }
         }
-
-        let icon = NSPanel(contentRect: CGRect(x: 0, y: 0, width: Self.iconSize, height: Self.iconSize),
-                           styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        icon.isOpaque = false
-        icon.backgroundColor = .clear
-        icon.hasShadow = false
-        icon.level = .floating
-        icon.hidesOnDeactivate = false
-        icon.isReleasedWhenClosed = false
-        icon.contentView = DragIcon()
-        self.icon = icon
     }
-
-    private static let iconSize = 84.0
 
     private func dock(_ panel: NSPanel, beside frame: CGRect, animated: Bool) {
         let size = panel.frame.size, gap = 12.0
@@ -150,26 +135,6 @@ import SwiftUI
         let x = frame.maxX + gap + size.width <= screen.maxX ? frame.maxX + gap : max(screen.minX, frame.minX - gap - size.width)
         let target = CGRect(origin: CGPoint(x: x, y: min(frame.maxY, screen.maxY) - size.height), size: size)
         animated ? panel.animator().setFrame(target, display: true) : panel.setFrame(target, display: true)
-    }
-
-    /// Over the top right of System Settings' list, flying out of the panel's header and back.
-    private func placeIcon(over frame: CGRect, shown: Bool) {
-        guard let icon, let panel else { return }
-        let wanted = shown && active?.takesDrop == true && active.map(granted.contains) == false
-        let header = CGRect(x: panel.frame.midX - Self.iconSize / 2, y: panel.frame.maxY - 22 - 32 - Self.iconSize / 2,
-                            width: Self.iconSize, height: Self.iconSize)
-        let spot = CGRect(x: frame.maxX - Self.iconSize - 28, y: frame.maxY - 52 - Self.iconSize + 8,
-                          width: Self.iconSize, height: Self.iconSize)
-        if wanted, !iconOut {
-            icon.setFrame(header, display: false)
-            icon.orderFront(nil)
-            NSAnimationContext.runAnimationGroup { $0.duration = 0.45; icon.animator().setFrame(spot, display: true) }
-        } else if wanted, icon.frame.origin != spot.origin {
-            icon.setFrame(spot, display: true)
-        } else if !wanted, iconOut {
-            icon.orderOut(nil)
-        }
-        withAnimation(.smooth) { iconOut = wanted }
     }
 
     private static let settingsID = "com.apple.systempreferences"
@@ -253,11 +218,10 @@ private struct GuideView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 64, height: 64)
-                .saturation(guide.iconOut ? 0 : 1)
-                .opacity(guide.iconOut ? 0.35 : 1)
+            // Picked up right here, where the eye already is; it bobs while the open list waits for it.
+            DraggableIcon(bobbing: guide.wantsDrop)
+                .frame(width: 84, height: 84)
+                .padding(-10)
             Text("Permissions").font(.title2.bold())
             VStack(spacing: 0) {
                 ForEach(PermissionGuide.Kind.allCases.filter { $0 != .calendars || calendarTitles }) { kind in
@@ -286,8 +250,8 @@ private struct GuideView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(kind.title).fontWeight(.medium)
                 Group {
-                    if guide.active == kind, kind.takesDrop, !guide.granted.contains(kind) {
-                        Text("Drag the icon into the list").foregroundStyle(.tint)
+                    if guide.active == kind, guide.wantsDrop {
+                        Text("Drag the icon above into the list").foregroundStyle(.tint)
                     } else {
                         Text(kind.detail).foregroundStyle(.secondary)
                     }
@@ -314,13 +278,20 @@ private struct GuideView: View {
     }
 }
 
+private struct DraggableIcon: NSViewRepresentable {
+    let bobbing: Bool
+    func makeNSView(context: Context) -> DragIcon { DragIcon() }
+    func updateNSView(_ view: DragIcon, context: Context) { view.bobbing = bobbing }
+}
+
 /// Reprise's icon to drop on System Settings' list, bobbing gently so it reads as something to pick up.
 /// An AppKit drag that puts the app's file URL on the pasteboard up front, as Finder does: System
 /// Settings reads it only after the password prompt, when the drag is over, and SwiftUI's onDrag
 /// offered it lazily through an item provider, gone by then. The prompt passed, nothing was added.
-private final class DragIcon: NSView, NSDraggingSource {
+final class DragIcon: NSView, NSDraggingSource {
     private let image = NSApp.applicationIconImage ?? NSImage()
     private let icon = CALayer()
+    var bobbing = false { didSet { if bobbing != oldValue { needsLayout = true } } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -334,7 +305,7 @@ private final class DragIcon: NSView, NSDraggingSource {
         setAccessibilityElement(true)
         setAccessibilityRole(.image)
         setAccessibilityLabel("Reprise")
-        setAccessibilityHelp(String(localized: "Drag the icon into the list"))
+        setAccessibilityHelp(String(localized: "Drag the icon above into the list"))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -342,7 +313,8 @@ private final class DragIcon: NSView, NSDraggingSource {
     override func layout() {
         super.layout()
         icon.frame = bounds.insetBy(dx: 10, dy: 10)
-        guard icon.animation(forKey: "bob") == nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        guard bobbing, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return icon.removeAnimation(forKey: "bob") }
+        guard icon.animation(forKey: "bob") == nil else { return }
         let bob = CABasicAnimation(keyPath: "transform.translation.y")
         bob.fromValue = -4
         bob.toValue = 4
