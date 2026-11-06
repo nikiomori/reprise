@@ -22,6 +22,8 @@ import SwiftUI
     private var icon: NSPanel?
     private var follow: Task<Void, Never>?
     private var closing: NSObjectProtocol?
+    /// Reprise's own windows, out of the way while the guide is up.
+    private var hidden: [NSWindow] = []
 
     func open(_ kind: Kind) {
         active = kind
@@ -36,7 +38,14 @@ import SwiftUI
             return
         }
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(kind.rawValue)")!)
-        if panel == nil { makePanels() }
+        if panel == nil {
+            makePanels()
+            // The guide takes the place of the window it was asked from. Picking the icon up makes
+            // Reprise the active app, and macOS brings its windows forward: the welcome window or
+            // Settings covered the list and caught the drop.
+            hidden = NSApp.windows.filter { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
+            hidden.forEach { $0.orderOut(nil) }
+        }
         settingsFrame = nil // place again, and send the icon out over the list just opened
         if follow == nil { follow = Task { await run() } }
     }
@@ -50,6 +59,8 @@ import SwiftUI
         panel = nil
         icon = nil
         windows.forEach { $0?.close() }
+        hidden.forEach { $0.orderFront(nil) }
+        hidden = []
         iconOut = false
         active = nil
     }
@@ -127,7 +138,7 @@ import SwiftUI
         icon.level = .floating
         icon.hidesOnDeactivate = false
         icon.isReleasedWhenClosed = false
-        icon.contentView = FirstClickHosting(rootView: AnyView(DragIcon()))
+        icon.contentView = DragIcon()
         self.icon = icon
     }
 
@@ -304,23 +315,58 @@ private struct GuideView: View {
 }
 
 /// Reprise's icon to drop on System Settings' list, bobbing gently so it reads as something to pick up.
-private struct DragIcon: View {
-    @State private var up = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+/// An AppKit drag that puts the app's file URL on the pasteboard up front, as Finder does: System
+/// Settings reads it only after the password prompt, when the drag is over, and SwiftUI's onDrag
+/// offered it lazily through an item provider, gone by then. The prompt passed, nothing was added.
+private final class DragIcon: NSView, NSDraggingSource {
+    private let image = NSApp.applicationIconImage ?? NSImage()
+    private let icon = CALayer()
 
-    var body: some View {
-        Image(nsImage: NSApp.applicationIconImage)
-            .resizable()
-            .frame(width: 64, height: 64)
-            .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
-            .offset(y: up ? -4 : 4)
-            .frame(width: 84, height: 84)
-            .onDrag { NSItemProvider(contentsOf: Bundle.main.bundleURL) ?? NSItemProvider() }
-            .accessibilityLabel("Reprise")
-            .accessibilityHint("Drag the icon into the list")
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { up = true }
-            }
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        icon.contents = image
+        icon.contentsGravity = .resizeAspect
+        icon.shadowOpacity = 0.3
+        icon.shadowRadius = 6
+        icon.shadowOffset = CGSize(width: 0, height: -3)
+        layer?.addSublayer(icon)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        setAccessibilityLabel("Reprise")
+        setAccessibilityHelp(String(localized: "Drag the icon into the list"))
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        icon.frame = bounds.insetBy(dx: 10, dy: 10)
+        guard icon.animation(forKey: "bob") == nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let bob = CABasicAnimation(keyPath: "transform.translation.y")
+        bob.fromValue = -4
+        bob.toValue = 4
+        bob.duration = 1.1
+        bob.autoreverses = true
+        bob.repeatCount = .infinity
+        bob.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        icon.add(bob, forKey: "bob")
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {} // a drag starts on the first move
+
+    override func mouseDragged(with event: NSEvent) {
+        let item = NSPasteboardItem()
+        item.setString(Bundle.main.bundleURL.absoluteString, forType: .fileURL)
+        item.setPropertyList([Bundle.main.bundlePath], forType: NSPasteboard.PasteboardType("NSFilenamesPboardType"))
+        let drag = NSDraggingItem(pasteboardWriter: item)
+        drag.setDraggingFrame(icon.frame, contents: image)
+        beginDraggingSession(with: [drag], event: event, source: self)
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        [.copy, .link, .generic]
     }
 }
