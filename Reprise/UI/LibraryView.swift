@@ -31,8 +31,8 @@ struct LibraryView: View {
             .contextMenu(forSelectionType: Recording.ID.self) { ids in
                 if let recording = shown.first(where: { ids.contains($0.id) }) {
                     Group {
-                        ShareLink("Share…", item: CallFile(recording), preview: SharePreview(recording.title))
-                        ShareLink("Share Whole Call as ZIP…", item: CallArchive(recording), preview: SharePreview(recording.title))
+                        Button("Share…") { share(CallFile(recording)) }
+                        Button("Share Whole Call as ZIP…") { share(CallArchive(recording)) }
                     }
                     .disabled(model.isLive(recording)) // its file is still being written
                     Button("Show in Finder") { model.store.revealInFinder(recording) }
@@ -109,6 +109,17 @@ struct LibraryView: View {
 
     private var selected: Recording? {
         model.store.recordings.first { $0.id == model.selection }
+    }
+
+    /// The share picker where the list was right-clicked. Not a `ShareLink`: in a context menu it is a
+    /// remote view, and on macOS 27 a key it left to the menu went round between the menu and its window
+    /// until the stack ran out, a crash. The toolbar's Share menu isn't a context menu and keeps them.
+    private func share<T: Transferable & Sendable>(_ item: T) {
+        guard let view = NSApp.keyWindow?.contentView, let window = view.window else { return }
+        let provider = NSItemProvider()
+        provider.register(item) // still made only once a service is picked: the ZIP isn't zipped at the click
+        let point = view.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        NSSharingServicePicker(items: [provider]).show(relativeTo: NSRect(origin: point, size: .zero), of: view, preferredEdge: .minY)
     }
 
     /// "Tuesday, October 6", capitalized as a heading in languages that write weekdays in lowercase.
